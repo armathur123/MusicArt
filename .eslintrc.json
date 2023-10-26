@@ -12,7 +12,8 @@
         "unnamedComponents": "arrow-function"
       }
     ],
-    "object-curly-spacing": ["error", "always"]
-    
+    "object-curly-spacing": ["error", "always"],
+    "semi": ["error", "always"],
+    "comma-dangle": ["error", "never"]
   }
 }
