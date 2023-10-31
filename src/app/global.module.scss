@@ -1,0 +1,13 @@
+@import "./../utils/scss/applicationConstants.module.scss";
+
+.layout {
+    &_homepage_wrapper {
+        display: flex;
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        background-color: $application_background;
+        color: $base_text_color;
+        font-family: 'Inter', sans-serif;
+    }
+}

@@ -6,7 +6,7 @@ type AuthorizationConstantsType = {
     accessTokenAuthorizationLink: string;
 }
 
-const scopes = ['user-read-private', 'user-read-email'];
+const scopes = ['user-read-private', 'user-read-email', 'user-top-read'];
 
 const authorizationConstants: AuthorizationConstantsType = {
     clientID: 'f1dcef1720f4432b9dcd4138b84d08fa',
@@ -16,4 +16,8 @@ const authorizationConstants: AuthorizationConstantsType = {
     accessTokenAuthorizationLink: 'https://accounts.spotify.com/api/token'
 };
 
-export default authorizationConstants;
+const spotifyDataEndpoints = {
+    getUserProfileData: 'https://api.spotify.com/v1/me'
+};
+
+export { authorizationConstants, spotifyDataEndpoints };
