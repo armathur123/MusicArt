@@ -1,0 +1,69 @@
+@import '../../../utils/scss/applicationConstants.module.scss';
+
+.profile_widget {
+    &_parent {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        height: 40vh ;
+        width: 40%;
+    }
+
+    &_container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: $widget_background;
+        border-radius: 15px;
+        position: relative;
+        height: 100%;
+        width: 100%;
+    }
+
+    &_image_parent {
+        border-color: $application_background;
+        height: 100%;
+        width: 100%;
+        position: relative;
+        border-radius: 15px;
+        z-index: 1;
+    }
+
+    &_info_container {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: flex-start;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        z-index: 10;
+        background-color: rgba(0, 0, 0, 0.322);
+        height: 100%;
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 15px;
+        padding-left: 15px;
+        padding-bottom: 15px;
+        gap: 2px;
+
+
+        h1 {
+            font-size: 20px;
+            font-weight: 300px;
+        }
+
+        h2 {
+            font-size: 13px;
+            font-weight: 150px;
+        }
+    }
+
+    &_bottom_button_container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+}

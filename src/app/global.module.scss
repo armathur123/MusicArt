@@ -1,13 +1,34 @@
 @import "./../utils/scss/applicationConstants.module.scss";
+  
 
 .layout {
+    box-sizing: border-box;
+
     &_homepage_wrapper {
         display: flex;
         width: 100%;
+        height: 100%;
         justify-content: center;
         align-items: center;
         background-color: $application_background;
         color: $base_text_color;
         font-family: 'Inter', sans-serif;
     }
+
+    &_login_block {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        gap: 20px;
+
+        h1 {
+            font-weight: 800;
+        }
+        
+        h2 {
+            font-weight: 50;
+        }
+    }
 }
+

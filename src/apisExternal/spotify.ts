@@ -2,9 +2,7 @@ import { authorizationConstants, spotifyDataEndpoints } from '@/utils/applicatio
 
 import { base64encode, generateRandomString, sha256 } from '../utils/encoders';
 
-
 //authorization functions
-
 type AuthorizationParametersType = {
     response_type: string
     client_id: string,
@@ -22,14 +20,27 @@ type AccessTokenParametersType = {
     code_verifier: string;
 }
 
-type SpotifyEndpointRequestType = {
-    accessToken: string;
+export type SpotifyAuthorizationToken = `Bearer ${string}`
+
+//Spotify Return Types
+
+type SpotifyImages = {
+    height: number;
+    width: number;
+    url: string;
+}
+
+export type SpotifyProfileReturnType = {
+    email: `${string}@${string}`;
+    display_name: string;
+    product: string;
+    images: SpotifyImages[];
 }
 
 class SpotifyApi {
     // consider seperating these calls into hooks (authFlowHook, getUserProfileDataHook)
 
-    redirectToSpotifyAuthorizationFlow = async () => {
+    redirectToSpotifyAuthorizationFlow: () => void = async () => {
         const codeVerifier  = generateRandomString(64);
         localStorage.setItem('verifier', codeVerifier);
     
@@ -71,11 +82,10 @@ class SpotifyApi {
     };
     
     // GET Spotify User profile data
-    
-    getSpotifyUserProfile = async ( { accessToken }: SpotifyEndpointRequestType ) => {    
+    getSpotifyUserProfile = async ( accessToken: SpotifyAuthorizationToken ) => {    
         const request = await fetch(spotifyDataEndpoints.getUserProfileData, {
             method: 'GET',
-            headers: { Authorization: `Bearer ${accessToken}` }
+            headers: { Authorization: accessToken }
         });
    
         const response = await request.json();

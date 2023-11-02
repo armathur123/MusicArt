@@ -1,74 +1,37 @@
 'use client';
 
-import Image from 'next/image';
-import styles from './page.module.css';
 import { Button } from '@mui/material';
-import spotifyApi from '../apisExternal/spotify';
+import spotifyApi, { SpotifyProfileReturnType } from '../apisExternal/spotify';
 import { useEffect, useState } from 'react';
+import CircularProgress from '@mui/material/CircularProgress';
+import { useSpotifyApi } from '@/utils/hooks/useSpotifyApi';
+import { spotifyDataEndpoints } from '@/utils/applicationConstants';
+import styles from './global.module.scss';
+import ProfileWidget from './_components/_profileWidget/ProfileWidget';
 
 const Home = () => {
-
-    const [authorizationCode, setAuthorizationCode] = useState<string>();
-    const [accessToken, setAccessToken] = useState<string>();
-    const [userProfileData, setUserProfileData] = useState<Object>();
-
-    //put all these useeffects into one hook
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get('code');
-        if (!code) {
-            return;
-        }
-        else {
-            var url= document.location.href;
-            window.history.pushState({}, '', url.split('?')[0]);
-            setAuthorizationCode(code);         
-        }
+    const { data, loading, error } = useSpotifyApi<SpotifyProfileReturnType>(spotifyDataEndpoints.getUserProfileData, {
+        method: 'GET' 
     });
 
     useEffect(() => {
-        if (!authorizationCode) {
+        if (!data) {
             return;
         }
         else {
-            (async () => {
-                console.log(authorizationCode);
-                const accessToken = await spotifyApi.getAccessToken(authorizationCode);
-                setAccessToken(accessToken);
-            })();
+            console.log(data, 'check');
         }
-    }, [authorizationCode]);
-
-    useEffect(() => {
-        console.log(accessToken, 'accessmfger');
-        if (!accessToken) {
-            return;
-        }
-        else {
-            (async () => {
-                const userProfileData = await spotifyApi.getSpotifyUserProfile({ accessToken });
-                setUserProfileData(userProfileData);    
-            })();
-        }
-    }, [accessToken]);
-
-    useEffect(() => {
-        if (!userProfileData) {
-            return;
-        }
-        else {
-            console.log(userProfileData, 'check');
-        }
-    }, [userProfileData]);
+    }, [data]);
 
     return (
-        <div>
+        <div className={styles.layout_login_block}>
             <h1>Musicart</h1>
-            <h2> Welcome to music art! {authorizationCode ? 'Is this you?' : 'Login in below to get started.'}</h2>
-            {!authorizationCode && <Button variant="contained" onClick={() => {
-                console.log('login button pressed');
+            <h2> Leveraging your music data to create personalized art. {data && 'Is this you?'}</h2>
+            {loading && <CircularProgress />}
+            {!data && !loading && <Button variant="outlined" onClick={() => {
                 spotifyApi.redirectToSpotifyAuthorizationFlow();
-            }}>Login to Spotify</Button>}
+            }}>Get started</Button>}
+            {data && <ProfileWidget profileData={data} />}
         </div>
     );
 };
