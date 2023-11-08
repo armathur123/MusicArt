@@ -80,6 +80,22 @@ class SpotifyApi {
         const { access_token } = await request.json();
         return access_token;
     };
+
+    swapAccessToken = async (code: string): Promise<string> => {
+        const accessTokenParameters: {code: string} = {
+            code
+        };
+        const request = await fetch(authorizationConstants.accessTokenSwapLink, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams(accessTokenParameters)
+        });
+    
+        const { access_token } = await request.json();
+        return access_token;
+    };
     
     // GET Spotify User profile data
     getSpotifyUserProfile = async ( accessToken: SpotifyAuthorizationToken ) => {    

@@ -9,14 +9,18 @@ type HTTPRequestTypes = 'POST' | 'GET' | 'PUT' | 'DELETE'
 
 type BasicApiOptions = {
     method: HTTPRequestTypes;
-    body?: URLSearchParams;
+    params?: Record<string, string>;
 }
 
-type SpotifyApiRequestOptions = BasicApiOptions & {
+type SpotifyApiRequestOptions = {
+    method: HTTPRequestTypes;
     headers: {
         Authorization: SpotifyAuthorizationToken;
-        'Content-Type': string;
+        // 'Content-Type': string;
+        // 'Access-Control-Allow-Origin': string;
+        // 'Access-Control-Allow-Headers': string;
     };
+    body?: URLSearchParams;
 }
 
 export const useSpotifyApi = <T>(url: string, options: BasicApiOptions) => {
@@ -39,18 +43,26 @@ export const useSpotifyApi = <T>(url: string, options: BasicApiOptions) => {
         (async () => {
             setLoading(true);
             try {
+                const isGet = options.method === 'GET';
                 const requestOptions: SpotifyApiRequestOptions = {
+                    method: options.method,
                     headers: {
-                        Authorization: accessToken,
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    ...options
+                        Authorization: accessToken
+                    }
                 };
-                const response = await fetch(url, requestOptions);
+                if (isGet) {
+                    requestOptions.body = requestOptions.body;
+                }
+                console.log(options, 'woa');
+                const finalUrl = isGet ? `${url}?${new URLSearchParams(options.params)}` : url;
+                console.log(finalUrl);
+                const response = await fetch(finalUrl, requestOptions);
                 const responseJSON: T = await response.json();
+                console.log(responseJSON, 'hit');
                 setData(responseJSON);
             } catch (error) {
                 setError('There was an error fetching the data.');
+                console.log(error, 'Api fetch error');
             }
             setLoading(false);
         })();

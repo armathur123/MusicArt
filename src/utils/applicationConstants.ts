@@ -4,6 +4,7 @@ type AuthorizationConstantsType = {
     scope: string;
     userAuthorizationLink:string;
     accessTokenAuthorizationLink: string;
+    accessTokenSwapLink: string;
 }
 
 const scopes = ['user-read-private', 'user-read-email', 'user-top-read'];
@@ -13,12 +14,13 @@ const authorizationConstants: AuthorizationConstantsType = {
     redirectUri: 'http://localhost:3000',
     scope:  scopes.join(' '),
     userAuthorizationLink: 'https://accounts.spotify.com/authorize',
-    accessTokenAuthorizationLink: 'https://accounts.spotify.com/api/token'
+    accessTokenAuthorizationLink: 'https://accounts.spotify.com/api/token',
+    accessTokenSwapLink: 'https://api.spotify.com/v1/swap'
 };
 
 const spotifyDataEndpoints = {
     getUserProfileData: 'https://api.spotify.com/v1/me',
-    getUsersTop: 'https://api.spotify.com/v1/me/top'
+    getUsersTop: 'https://api.spotify.com/v1/me/top/tracks'
 };
 
 export { authorizationConstants, spotifyDataEndpoints };

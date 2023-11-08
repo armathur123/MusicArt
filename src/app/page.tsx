@@ -14,14 +14,14 @@ const Home = () => {
         method: 'GET' 
     });
 
-    useEffect(() => {
-        if (!data) {
-            return;
-        }
-        else {
-            console.log(data, 'check');
-        }
-    }, [data]);
+    // useEffect(() => {
+    //     if (!data) {
+    //         return;
+    //     }
+    //     else {
+    //         console.log(data, 'check');
+    //     }
+    // }, [data]);
 
     return (
         <div className={styles.layout_login_block}>

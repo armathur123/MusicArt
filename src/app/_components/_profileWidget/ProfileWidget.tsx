@@ -17,11 +17,6 @@ interface IProfileWidgetProps {
 }
 
 const ProfileWidget: React.FC<IProfileWidgetProps> = ({ profileData }) => {
-    const router = useRouter();
-
-    useEffect(() => {
-        console.log(profileData);
-    }, [profileData]);
 
     return ( 
         <div className={styles.profile_widget_parent}>

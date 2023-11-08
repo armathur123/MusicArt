@@ -4,10 +4,22 @@ const nextConfig = {
         remotePatterns: [
             {
                 protocol: 'https',
-                hostname: 'scontent-ord5-2.xx.fbcdn.net',
-                port: ''
+                hostname: '**.scdn.co'
+            },
+            {
+                protocol: 'https',
+                hostname: '**.spotifycdn.com'
+            },
+            {
+                protocol: 'https',
+                hostname: '**fbcdn.net'
+            },
+            {
+                protocol: 'https',
+                hostname: 'scontent-ord5**'
             }
         ]
+      
     }
     
 };
