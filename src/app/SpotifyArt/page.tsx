@@ -39,6 +39,7 @@ const SpotifyArt = () => {
 
 
     const databind = (data: number[]) => {
+        //https://www.datamake.io/blog/d3-canvas-full
         // This is your SVG replacement and the parent of all other elements:
         const colourScale = d3.scaleSequential(d3.interpolateSpectral);
         const join = custom.selectAll('custom.rect').data(data);
