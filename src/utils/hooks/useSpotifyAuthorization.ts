@@ -10,7 +10,7 @@ export const useSpotifyAuthorization = () => {
     const [error, setError] = useState('');
     const params = new URLSearchParams(window.location.search);
 
-    // need to implement refresh token here. also find an alternative to localstorage if possible
+    // need to implement refresh token here. also find an alternative to localstorage if possible (right now need to clear storage after token expires :\)
     useEffect(() => {
         const code = params.get('code');
         const access_token = localStorage.getItem('access_token_spotify');

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 const RootLayout = ({ children }: {children: React.ReactNode}) => {
     return (
-        <html lang="en">
+        <html lang="en" className={styles.html}>
             <body className={styles.layout_homepage_wrapper}>{children}</body>
         </html>
     );

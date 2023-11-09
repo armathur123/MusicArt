@@ -53,12 +53,9 @@ export const useSpotifyApi = <T>(url: string, options: BasicApiOptions) => {
                 if (isGet) {
                     requestOptions.body = requestOptions.body;
                 }
-                console.log(options, 'woa');
                 const finalUrl = isGet ? `${url}?${new URLSearchParams(options.params)}` : url;
-                console.log(finalUrl);
                 const response = await fetch(finalUrl, requestOptions);
                 const responseJSON: T = await response.json();
-                console.log(responseJSON, 'hit');
                 setData(responseJSON);
             } catch (error) {
                 setError('There was an error fetching the data.');
