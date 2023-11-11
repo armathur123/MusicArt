@@ -29,6 +29,7 @@ const Home = () => {
             <h2> Leveraging your music data to create personalized art. {data && 'Is this you?'}</h2>
             {loading && <CircularProgress />}
             {!data && !loading && <Button variant="outlined" onClick={() => {
+                console.log('button click!');
                 spotifyApi.redirectToSpotifyAuthorizationFlow();
             }}>Get started</Button>}
             {data && <ProfileWidget profileData={data} />}

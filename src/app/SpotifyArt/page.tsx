@@ -20,9 +20,6 @@ const SpotifyArt = () => {
     const canvas = useRef<any>();
     const circleImageRef = useRef<any>();
 
-    const data: {value: number}[] = [];
-    d3.range(5000).forEach((el) => { data.push({ value: el }); });
-
     const width = 750;
     const height = 400; 
     
@@ -41,7 +38,7 @@ const SpotifyArt = () => {
     const databind = (data: number[]) => {
         //https://www.datamake.io/blog/d3-canvas-full
         // This is your SVG replacement and the parent of all other elements:
-        const colourScale = d3.scaleSequential(d3.interpolateSpectral);
+        const colourScale = d3.scaleSequential(d3.extent(data, (d) => d) as [number, number], d3.interpolateSpectral);
         const join = custom.selectAll('custom.rect').data(data);
         var enterSel = join
             .enter()
@@ -106,7 +103,7 @@ const SpotifyArt = () => {
             if (elapsed > 300) t.stop();
         });
 
-    }, [data]);
+    });
 
     return (
         <div className={styles.spotify_art_container}>
