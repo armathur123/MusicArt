@@ -29,7 +29,7 @@ export const useSpotifyAuthorization = () => {
                 var url= document.location.href;
                 window.history.pushState({}, '', url.split('?')[0]);
             }
-        };
+        }
     });
 
     useEffect(() => {
