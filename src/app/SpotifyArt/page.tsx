@@ -7,6 +7,7 @@ import styles from './spotifyArt.module.scss';
 import HeartSvg from '../../../public/heart.svg';
 import * as d3 from 'd3';
 import Circle from '../_components/_circle/Circle';
+import Image from 'next/image';
 
 
 const SpotifyArt = () => {
@@ -20,8 +21,8 @@ const SpotifyArt = () => {
     const canvas = useRef<any>();
     const circleImageRef = useRef<any>();
 
-    const width = 750;
-    const height = 600; 
+    const width = 550;
+    const height = 550; 
     
     var customBase = document.createElement('custom');
     var custom = d3.select(customBase);
@@ -68,9 +69,59 @@ const SpotifyArt = () => {
             .remove();
     };
 
-    const draw = () => {
+    const getSvgCanvasPath = (svgPath: string, context: CanvasRenderingContext2D) => {
+        // need to figure out how to get these from the svg path...
+        const radiusWidth = 32; 
+        const radiusHeight = 50;
+        const scaleMultiplier = 11;
+        let svgToCanvasPath = new Path2D(svgPath); // create canvas path from svg path
+        // https://www.w3schools.com/jsref/canvas_transform.asp
+        const transformationMatrix = {
+            a: scaleMultiplier,                                             // Scales the drawing horizontally	
+            b: 0,                                                           // Skew the the drawing horizontally
+            c: 0,                                                           // Skew the the drawing vertically
+            d: scaleMultiplier,                                             // Scales the drawing vertically
+            e: (width / 2) - radiusWidth * scaleMultiplier,                 // Moves the the drawing horizontally
+            f: (height / 2) - radiusWidth * scaleMultiplier                 // Moves the the drawing vertically
+        };
+        const transformedPath = new Path2D();
+        transformedPath.addPath(svgToCanvasPath, transformationMatrix);
+        // context.strokeStyle = 'rgba(0,0,255, 0)';
+        // context.globalCompositeOperation = 'source-over';
+        context.stroke(transformedPath);
+        return transformedPath;
+    };
+
+    const getCoordinatesInSvg = (transformedPath: Path2D, context: CanvasRenderingContext2D) => {
+        const coordinatesInSvg: {x: number, y: number}[] = [];
+        for (let x = 0; x <= width; x++) {
+            for (let y = 0; y <= height; y++) {
+                const isInPath = context.isPointInPath(transformedPath, x, y);
+                if (isInPath) {
+                    coordinatesInSvg.push({ x, y });
+                }
+            }
+        }
+        return coordinatesInSvg;
+    };
+
+    const draw = (svgPath: string) => {
         const context = canvas.current.getContext('2d');
-        // context.clearRect(0, 0, width, height);
+        const transformedPath = getSvgCanvasPath(svgPath, context);
+        const coordinatesInSvg = getCoordinatesInSvg(transformedPath, context);
+        console.log(coordinatesInSvg, 'check');
+
+
+        for (let i = 0; i < coordinatesInSvg.length; i += 200) {
+            console.log(coordinatesInSvg[i]);
+            context.beginPath();
+            context.strokeStyle = '#ADD8E6';
+            context.lineWidth = '.5';
+            context.arc(coordinatesInSvg[i].x, coordinatesInSvg[i].y, 10, 0, 2 * Math.PI);
+            context.stroke();
+        }
+
+
         // Draw each individual custom element with their properties.
         var elements = custom.selectAll('custom.rect'); // Grab all elements you bound data to in the databind() function.
         elements.each(function (d, i) {
@@ -81,51 +132,28 @@ const SpotifyArt = () => {
             // and set the fillStyle for the canvas paint:
             context.fillStyle = node.attr('fillStyle');
 
-            // Here you retrieve the position of the node and apply it to the
-            // fillRect context function which will fill and paint the square:
-            context.fillRect(node.attr('x'),
-                node.attr('y'),
-                node.attr('width'),
-                node.attr('height'));
+            /*
+                Create an array of arrays; index of primary array represents x coordinates, the array it accesses is full of y coordinates
+            */
+            // if (isIn) {
+            //     context.arc(x, y, r, sAngle, eAngle, counterclockwise);
+            // }
         });
-    };
-
-    const addCavnasPathFromSvgPath = (svgPath: string) => {
-        let context = canvas.current.getContext('2d');
-        // need to figure out how to get these from the svg path...
-        const radiusWidth = 20; 
-        const radiusHeight = 20;
-        let svgToCanvasPath = new Path2D(svgPath); // create canvas path from svg path
-        // https://www.w3schools.com/jsref/canvas_transform.asp
-        const transformationMatrix = {
-            a: 5,                       // Scales the drawing horizontally	
-            b: 0,                       // Skew the the drawing horizontally
-            c: 0,                       // Skew the the drawing vertically
-            d: 5,                       // Scales the drawing vertically
-            e: width / 2 - radiusWidth * 5,         // Moves the the drawing horizontally
-            f: height / 2 - radiusHeight * 5                        // Moves the the drawing vertically
-        };
-        const transformedPath = new Path2D();
-        transformedPath.addPath(svgToCanvasPath, transformationMatrix);
-        context.strokeStyle = '#fff';
-        context.lineWidth = 1;
-        context.stroke(transformedPath);
     };
  
     useEffect(() => {
         canvas.current.width = width;
         canvas.current.height = height;
         
-        addCavnasPathFromSvgPath('M35.45 15.44 32 19l-3.54-3.53A11.67 11.67 0 0 0 12 31.94l3.54 3.54 8.25 8.25L32 52l8.25-8.25 8.25-8.25 3.5-3.56a11.67 11.67 0 0 0-16.5-16.5z'); // temp hardcoded path
 
         // Build the custom elements in memory:
-        databind(d3.range(1000));
+        databind(d3.range(5000));
 
         // Timer running the draw function repeatedly for 300 ms:
-        // var t = d3.timer((elapsed) => {
-        //     draw();
-        //     if (elapsed > 300) t.stop();
-        // });
+        var t = d3.timer((elapsed) => {
+            draw('M35.45 15.44 32 19l-3.54-3.53A11.67 11.67 0 0 0 12 31.94l3.54 3.54 8.25 8.25L32 52l8.25-8.25 8.25-8.25 3.5-3.56a11.67 11.67 0 0 0-16.5-16.5z'); // temp hardcoded path
+            if (elapsed > 300) t.stop();
+        });
 
     });
 
@@ -134,7 +162,6 @@ const SpotifyArt = () => {
             <div id="container">
                 <canvas ref={canvas} />    
             </div>
-
         </div>
     );
 
