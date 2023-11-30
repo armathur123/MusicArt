@@ -8,20 +8,12 @@ import { useSpotifyApi } from '@/utils/hooks/useSpotifyApi';
 import { spotifyDataEndpoints } from '@/utils/applicationConstants';
 import styles from './global.module.scss';
 import ProfileWidget from './_components/_profileWidget/ProfileWidget';
+import ParticleArt from './ParticleArt/page';
 
 const Home = () => {
     const { data, loading, error } = useSpotifyApi<SpotifyProfileReturnType>(spotifyDataEndpoints.getUserProfileData, {
         method: 'GET' 
     });
-
-    // useEffect(() => {
-    //     if (!data) {
-    //         return;
-    //     }
-    //     else {
-    //         console.log(data, 'check');
-    //     }
-    // }, [data]);
 
     return (
         <div className={styles.layout_login_block}>
