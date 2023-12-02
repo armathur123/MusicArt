@@ -2,19 +2,21 @@
 
 import { useEffect, useRef } from 'react';
 import styles from './particleArt.module.scss';
-import { Effect } from '@/utils/canvasConstructors';
+import { ParticleEffect } from '@/utils/canvasConstructors';
 import { useSpotifyApi } from '@/utils/hooks/useSpotifyApi';
 import { spotifyDataEndpoints } from '@/utils/applicationConstants';
+import { Artist } from '@spotify/web-api-ts-sdk';
 
 const ParticleArt = () => {
     const canvas = useRef<HTMLCanvasElement>(null);
-    const width = 550;
-    const height = 550; 
+    const width = 650;
+    const height = 650; 
 
-    const { data, loading, error } = useSpotifyApi<{items: {genres: string[]}[]}>(spotifyDataEndpoints.getUsersTop.artist, {
+    const { data, loading, error } = useSpotifyApi<{items: Artist[]}>(spotifyDataEndpoints.getUsersTop.artist, {
         method: 'GET',
         params: {
-            time_range: 'medium_term'
+            time_range: 'medium_term',
+            limit: '4'
         }
     });
 
@@ -23,20 +25,18 @@ const ParticleArt = () => {
         if (!canvas.current || !data) {
             return;
         }
-        const genres = data.items.map((artist) => {
-            return artist.genres;
-        });
-        console.log(genres, 'hji');
+        console.log(data, 'hji');
         const context = canvas.current.getContext('2d')!;
 
-        const effect = new Effect(width, height);
+        const effect = new ParticleEffect(width, height, data.items);
 
         const animate = () => {
             context.clearRect(0, 0, width, height);
             effect.render(context);
             requestAnimationFrame(animate);
         };
-        animate();
+        // animate();
+        effect.render(context);
 
     }, [data]);
 

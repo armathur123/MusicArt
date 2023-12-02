@@ -43,7 +43,7 @@ const ProfileWidget: React.FC<IProfileWidgetProps> = ({ profileData }) => {
                 <IconButton color='error' size='large'>
                     <HighlightOffIcon />
                 </IconButton>
-                <Link href="/ParticleArt">
+                <Link href="/ForceDirectedArt">
                     <CheckCircleIcon color='success' />
                 </Link>
             </div>
