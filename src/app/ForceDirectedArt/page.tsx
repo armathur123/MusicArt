@@ -15,19 +15,18 @@ const ForceDirectedArt = () => {
             limit: '20'
         }
     });
-    const width = 700, height = 700;
+    const width = 900, height = 900;
 
     useEffect(() => {
         if (!data) {
             return;
         }
+        console.log(data);
         const nodes: (Artist & d3.SimulationNodeDatum)[] = data.items.map((artist, i) => (
             { ...artist, index: i }
         ));
+        const svg = d3.select('svg');
         
-        /*
-        */
-
         const update = () => {
             // Add nodes
             // d3.select('svg')
@@ -44,36 +43,26 @@ const ForceDirectedArt = () => {
             //     .attr('cy', (d) => {
             //         return d.y ?? height / 2;
             //     });
-            d3.select('svg')
+          
+            svg
                 .selectAll('image')
                 .data(nodes)
                 .join('image')
-                .attr('width', (d) => d.popularity / 2)
-                .attr('height', (d) => d.popularity / 2)
+                .attr('width', (d) => d.popularity * 1.4)
+                .attr('height', (d) => d.popularity * 1.4)
                 .attr('x', (d) => {
                     return d.x ?? width / 2;
                 })
                 .attr('y', (d) => {
                     return d.y ?? height / 2;
                 })
-                .attr('xlink:href', (d) => d.images[0].url);
-
-
-
-
-                
-            /*
-            nodeEnter.append("svg:image")
-                .attr('x', -9)
-                .attr('y', -12)
-                .attr('width', 20)
-                .attr('height', 24)
-                .attr("xlink:href", "resources/images/check.png")
-
-            */
+                .attr('xlink:href', (d) => d.images[0].url)
+                .attr('style', 'clip-path: circle(40%);');
+            // .attr('clip-path', 'url(#myClipV2)');
+            // .attr('transform', 'translate(-4,-4)') in case you want to center this later? 
 
             // Add text to each circle node
-            d3.select('svg')
+            svg
                 .selectAll('text')
                 .data(nodes)
                 .join('text')
@@ -93,9 +82,9 @@ const ForceDirectedArt = () => {
         };
 
         const simulation = d3.forceSimulation<(Artist & d3.SimulationNodeDatum)>(nodes)
-            .force('charge', d3.forceManyBody().strength(-10))
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity / 2;}))
+            .force('charge', d3.forceManyBody().strength(-4))
+            .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
             .on('tick', update);
 
     }, [data]);
