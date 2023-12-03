@@ -24,34 +24,71 @@ const ForceDirectedArt = () => {
         const nodes: (Artist & d3.SimulationNodeDatum)[] = data.items.map((artist, i) => (
             { ...artist, index: i }
         ));
+        
+        /*
+        */
 
         const update = () => {
+            // Add nodes
+            // d3.select('svg')
+            //     .selectAll('circle')
+            //     .data(nodes)
+            //     .join('circle')
+            //     .attr('r', (d) => {
+            //         return d.popularity / 2;
+            //     })
+            //     .attr('fill', 'orange')
+            //     .attr('cx', (d) => {
+            //         return d.x ?? width / 2;
+            //     })
+            //     .attr('cy', (d) => {
+            //         return d.y ?? height / 2;
+            //     });
             d3.select('svg')
-                .selectAll('circle')
+                .selectAll('image')
                 .data(nodes)
-                .join('circle')
-                .attr('r', (d) => {
-                    return d.popularity / 2;
-                })
-                .attr('fill', 'orange')
-                .attr('cx', (d) => {
+                .join('image')
+                .attr('width', (d) => d.popularity / 2)
+                .attr('height', (d) => d.popularity / 2)
+                .attr('x', (d) => {
                     return d.x ?? width / 2;
                 })
-                .attr('cy', (d) => {
+                .attr('y', (d) => {
                     return d.y ?? height / 2;
-                });
+                })
+                .attr('xlink:href', (d) => d.images[0].url);
 
+
+
+
+                
+            /*
+            nodeEnter.append("svg:image")
+                .attr('x', -9)
+                .attr('y', -12)
+                .attr('width', 20)
+                .attr('height', 24)
+                .attr("xlink:href", "resources/images/check.png")
+
+            */
+
+            // Add text to each circle node
             d3.select('svg')
                 .selectAll('text')
                 .data(nodes)
                 .join('text')
                 .attr('text-anchor', 'middle')
                 .attr('stroke', 'white')
+                .attr('fill', 'white')
                 .attr('stroke-width', '1px')
                 .attr('alignment-baseline', 'middle')
+                .attr('lengthAdjust', 'spacingAndGlyphs')
+                .attr('font-size', (d) => 14)
+                .attr('font-weight', '200')
                 .attr('x', (d) => d.x!)
                 .attr('y', (d) => d.y!)
-                .text((d) => d.name);    
+                .attr('textLength', (d) => d.popularity * .7)
+                .text((d) => d.name);
 
         };
 
