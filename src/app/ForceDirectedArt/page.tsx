@@ -21,69 +21,100 @@ const ForceDirectedArt = () => {
         if (!data) {
             return;
         }
-        console.log(data);
-        const nodes: (Artist & d3.SimulationNodeDatum)[] = data.items.map((artist, i) => (
+
+        const svg = d3.select('svg');
+        const artists = data.items;
+
+        const nodes: (Artist & d3.SimulationNodeDatum)[] = artists.map((artist, i) => (
             { ...artist, index: i }
         ));
-        const svg = d3.select('svg');
+        const links: {source: string; target: string; commonGenres: string[]}[] = [];
         
+        // Could create a hashmap to track 'sourcetargets: commonGenres' that have already been compared; if they've been compared, just grab their common genre, flip source and target and add it in
+        const connectionCache: {[key: string]: string[] | undefined;} = {};
+        for (let i = 0; i < artists.length; i++) {
+            for (let j= 0; j < artists.length; j++) {
+                if (i === j) { // No need to compare artists against themselves
+                    continue;
+                }
+                const sortedIDs = [artists[i].id, artists[j].id].sort();
+                const connectionCacheKey = `${sortedIDs[0]}_${sortedIDs[1]}`;
+                const connectionCacheValue = connectionCache[connectionCacheKey];
+
+                if (connectionCacheValue) { // There is a cached connection, no need to duplicate it
+                    continue;
+                }
+                const commonGenres = artists[i].genres.filter((genre) => artists[j].genres.includes(genre));
+                const isCommonGenresEmpty = commonGenres.length === 0;
+                connectionCache[connectionCacheKey] = isCommonGenresEmpty ? undefined : commonGenres;
+                if (!isCommonGenresEmpty) {
+                    links.push({ source: artists[i].id, target: artists[j].id, commonGenres: commonGenres });
+                }
+            }
+        }
+
+        const textNodes = svg
+            .selectAll('text')
+            .data(nodes)
+            .join('text')
+            .attr('text-anchor', 'middle')
+            .attr('stroke', 'white')
+            .attr('fill', 'white')
+            .attr('stroke-width', '1px')
+            .attr('alignment-baseline', 'middle')
+            .attr('lengthAdjust', 'spacingAndGlyphs')
+            .attr('font-size', (d) => 14)
+            .attr('font-weight', '200')
+            .attr('textLength', (d) => d.popularity * .7)
+            .text((d) => d.name);
+
+        const artistNodes = svg
+            .selectAll('image')
+            .data(nodes)
+            .join('image')
+            .attr('width', (d) => d.popularity * 1.4)
+            .attr('height', (d) => d.popularity * 1.4)
+            .attr('xlink:href', (d) => d.images[0].url)
+            .attr('style', 'clip-path: circle(40%);');
+            // .attr('transform', 'translate(-4,-4)') in case you want to center this later (translate values are placeholders)? 
+
+        const linkNodes = svg
+            .selectAll('line')
+            .data(links)
+            .join('line')
+            .attr('stroke', 'white')
+            .attr('stroke-opacity', 0.6)      
+            .attr('stroke-width', d => Math.sqrt(d.commonGenres.length));
+
+        console.log(links);
+            
         const update = () => {
-            // Add nodes
-            // d3.select('svg')
-            //     .selectAll('circle')
-            //     .data(nodes)
-            //     .join('circle')
-            //     .attr('r', (d) => {
-            //         return d.popularity / 2;
-            //     })
-            //     .attr('fill', 'orange')
-            //     .attr('cx', (d) => {
-            //         return d.x ?? width / 2;
-            //     })
-            //     .attr('cy', (d) => {
-            //         return d.y ?? height / 2;
-            //     });
-          
-            svg
-                .selectAll('image')
-                .data(nodes)
-                .join('image')
-                .attr('width', (d) => d.popularity * 1.4)
-                .attr('height', (d) => d.popularity * 1.4)
+            artistNodes
                 .attr('x', (d) => {
                     return d.x ?? width / 2;
                 })
                 .attr('y', (d) => {
                     return d.y ?? height / 2;
-                })
-                .attr('xlink:href', (d) => d.images[0].url)
-                .attr('style', 'clip-path: circle(40%);');
-            // .attr('clip-path', 'url(#myClipV2)');
-            // .attr('transform', 'translate(-4,-4)') in case you want to center this later? 
+                });
 
             // Add text to each circle node
-            svg
-                .selectAll('text')
-                .data(nodes)
-                .join('text')
-                .attr('text-anchor', 'middle')
-                .attr('stroke', 'white')
-                .attr('fill', 'white')
-                .attr('stroke-width', '1px')
-                .attr('alignment-baseline', 'middle')
-                .attr('lengthAdjust', 'spacingAndGlyphs')
-                .attr('font-size', (d) => 14)
-                .attr('font-weight', '200')
+            textNodes
                 .attr('x', (d) => d.x!)
-                .attr('y', (d) => d.y!)
-                .attr('textLength', (d) => d.popularity * .7)
-                .text((d) => d.name);
+                .attr('y', (d) => d.y!);
+
+            linkNodes
+                .attr('x1', d => d.source.x!)
+                .attr('y1', d => d.source.y!)
+                .attr('x2', d => d.target.x!)
+                .attr('y2', d => d.target.y!);
+    
 
         };
 
         const simulation = d3.forceSimulation<(Artist & d3.SimulationNodeDatum)>(nodes)
+            .force('link', d3.forceLink<(Artist & d3.SimulationNodeDatum), {source: string, target: string}>(links).id((d) => d.id))
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('charge', d3.forceManyBody().strength(-4))
+            .force('charge', d3.forceManyBody().strength(30))
             .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
             .on('tick', update);
 
