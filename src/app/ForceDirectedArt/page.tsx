@@ -7,6 +7,10 @@ import * as d3 from 'd3';
 import { useEffect } from 'react';
 import Circle from '../_components/_circle/Circle';
 
+type ArtistLinkType = (Artist & d3.SimulationNodeDatum);
+
+type ArtistNodeType = (Artist & d3.SimulationNodeDatum);
+
 const ForceDirectedArt = () => {
     const { data, loading, error } = useSpotifyApi<{items: Artist[]}>(spotifyDataEndpoints.getUsersTop.artist, {
         method: 'GET',
@@ -28,7 +32,7 @@ const ForceDirectedArt = () => {
         const nodes: (Artist & d3.SimulationNodeDatum)[] = artists.map((artist, i) => (
             { ...artist, index: i }
         ));
-        const links: {source: string; target: string; commonGenres: string[]}[] = [];
+        const links: (d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]})[] = [];
         
         // Could create a hashmap to track 'sourcetargets: commonGenres' that have already been compared; if they've been compared, just grab their common genre, flip source and target and add it in
         const connectionCache: {[key: string]: string[] | undefined;} = {};
@@ -53,6 +57,30 @@ const ForceDirectedArt = () => {
             }
         }
 
+        const linkNodes = svg
+            .selectAll('line')
+            .data(links)
+            .join('line')
+            .attr('stroke', 'white')
+            .attr('stroke-opacity', 0.6)      
+            .attr('stroke-width', d => (d.commonGenres.length ** 2));
+
+        const artistNodes = svg
+            .selectAll('image')
+            .data(nodes)
+            .join('image')
+            .attr('width', (d) => d.popularity * 1.4)
+            .attr('height', (d) => d.popularity * 1.4)
+            .attr('xlink:href', (d) => d.images[0].url)
+            .attr('style', 'clip-path: circle(40%);')
+            .attr('transform', (d) => `translate(-${d.popularity * 1.4 / 2}, -${d.popularity * 1.4 / 2})`)
+            .on('mouseover', function (event, d) {
+                d3.select(this).transition()
+                    .duration(50)
+                    .attr('opacity', '.5');
+            });
+
+            
         const textNodes = svg
             .selectAll('text')
             .data(nodes)
@@ -68,23 +96,6 @@ const ForceDirectedArt = () => {
             .attr('textLength', (d) => d.popularity * .7)
             .text((d) => d.name);
 
-        const artistNodes = svg
-            .selectAll('image')
-            .data(nodes)
-            .join('image')
-            .attr('width', (d) => d.popularity * 1.4)
-            .attr('height', (d) => d.popularity * 1.4)
-            .attr('xlink:href', (d) => d.images[0].url)
-            .attr('style', 'clip-path: circle(40%);');
-            // .attr('transform', 'translate(-4,-4)') in case you want to center this later (translate values are placeholders)? 
-
-        const linkNodes = svg
-            .selectAll('line')
-            .data(links)
-            .join('line')
-            .attr('stroke', 'white')
-            .attr('stroke-opacity', 0.6)      
-            .attr('stroke-width', d => Math.sqrt(d.commonGenres.length));
 
         console.log(links);
             
@@ -114,7 +125,7 @@ const ForceDirectedArt = () => {
         const simulation = d3.forceSimulation<(Artist & d3.SimulationNodeDatum)>(nodes)
             .force('link', d3.forceLink<(Artist & d3.SimulationNodeDatum), {source: string, target: string}>(links).id((d) => d.id))
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('charge', d3.forceManyBody().strength(30))
+            .force('charge', d3.forceManyBody().strength(-20))
             .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
             .on('tick', update);
 
