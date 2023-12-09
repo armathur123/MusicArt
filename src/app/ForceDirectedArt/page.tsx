@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import Circle from '../_components/_circle/Circle';
 
 type ArtistNodeType = (Artist & d3.SimulationNodeDatum);
+type GenreLinksType = (d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]});
 
 const ForceDirectedArt = () => {
     const { data, loading, error } = useSpotifyApi<{items: Artist[]}>(spotifyDataEndpoints.getUsersTop.artist, {
@@ -30,7 +31,7 @@ const ForceDirectedArt = () => {
         const nodes: (Artist & d3.SimulationNodeDatum)[] = artists.map((artist, i) => (
             { ...artist, index: i }
         ));
-        const links: (d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]})[] = [];
+        const links: GenreLinksType[] = [];
         
         // Could create a hashmap to track 'sourcetargets: commonGenres' that have already been compared; if they've been compared, just grab their common genre, flip source and target and add it in
         const connectionCache: {[key: string]: string[] | undefined;} = {};
@@ -50,7 +51,7 @@ const ForceDirectedArt = () => {
                 const isCommonGenresEmpty = commonGenres.length === 0;
                 connectionCache[connectionCacheKey] = isCommonGenresEmpty ? undefined : commonGenres;
                 if (!isCommonGenresEmpty) {
-                    links.push({ source: artists[i].id, target: artists[j].id, commonGenres: commonGenres });
+                    // links.push({ source: artists[i].id, target: artists[j].id, commonGenres: commonGenres });
                 }
             }
         }
@@ -60,8 +61,7 @@ const ForceDirectedArt = () => {
             .data(links)
             .join('line')
             .attr('stroke', 'white')
-            .attr('stroke-opacity', 0.6)      
-            .attr('stroke-width', d => (d.commonGenres.length ** 2));
+            .attr('stroke-opacity', 0.6);
 
         const showTextOnNode = (show: boolean, id: string) => {
             const transition = d3.transition()
@@ -80,6 +80,41 @@ const ForceDirectedArt = () => {
             }
         };
 
+        const update = () => {
+            console.log('update');
+            artistNodes
+                .attr('x', (d) => {
+                    return d.x ?? width / 2;
+                })
+                .attr('y', (d) => {
+                    return d.y ?? height / 2;
+                });
+
+            // Add text to each circle node
+            textNodes
+                .attr('x', (d) => d.x!)
+                .attr('y', (d) => d.y!);
+
+            if (links) {
+                linkNodes
+                    .attr('x1', (d) =>  d3.select('#node' + d.source).attr('x'))
+                    .attr('y1', (d) => d3.select('#node' + d.source).attr('y'))
+                    .attr('x2', (d) => d3.select('#node' + d.target).attr('x'))
+                    .attr('y2', (d) => d3.select('#node' + d.target).attr('y'));    
+            }
+
+        };
+
+
+        const simulation = d3.forceSimulation<ArtistNodeType>(nodes)
+            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>(links).id((d) => d.id))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            // .force('charge', d3.forceManyBody().strength(-5))
+            .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
+            //custom force to keep stuff within the boundaries (not sure if this is necessary, look into it)
+            .on('tick', update);
+
+
         const artistNodes = svg
             .selectAll('image')
             .data(nodes)
@@ -97,14 +132,31 @@ const ForceDirectedArt = () => {
                 //     .attr('opacity', ''); 
 
                 showTextOnNode(true, d.id);
-                // const connectionCacheKeys = Object.keys(connectionCache);
-                // for (const connectionCacheKey of connectionCacheKeys) {
-                //     const containsID = connectionCacheKey.
-                // }
-                // show links only on hover || hide other links on hover ?
             })
             .on('mouseout', (event, d) => {
                 showTextOnNode(false, d.id);
+            })
+            .on('click', (event, d) => {
+                links.length = 0;
+                simulation.stop();
+
+                const connectionCacheKeys: string[] = Object.keys(connectionCache);
+                for (const connectionCacheKey of connectionCacheKeys) {
+                    const containsID = connectionCacheKey.includes(d.id);
+                    if (containsID) {
+                        const targetID = connectionCacheKey.split('_').find((value) => value !== d.id);
+                        links.push({ source: d.id, target: targetID!, commonGenres: connectionCache[connectionCacheKey]! });
+                    }
+                }
+                // const convert = (id: string) => {
+                //     return data.items.find((item) => item.id === id)?.name;
+                // };
+                // links.forEach((link) => {
+                //     console.log(convert(link.source as string), convert(link.target as string), link.commonGenres);
+                // });    
+                        
+                // .attr('stroke-width', d => (d.commonGenres.length ** 2));
+                simulation.restart();
             });
 
             
@@ -132,37 +184,6 @@ const ForceDirectedArt = () => {
             });
 
             
-        const update = () => {
-            artistNodes
-                .attr('x', (d) => {
-                    return d.x ?? width / 2;
-                })
-                .attr('y', (d) => {
-                    return d.y ?? height / 2;
-                });
-
-            // Add text to each circle node
-            textNodes
-                .attr('x', (d) => d.x!)
-                .attr('y', (d) => d.y!);
-
-            linkNodes
-                .attr('x1', (d: any) => d.source.x!)
-                .attr('y1', (d: any) => d.source.y!)
-                .attr('x2', (d: any) => d.target.x!)
-                .attr('y2', (d: any) => d.target.y!);
-    
-
-        };
-
-        const simulation = d3.forceSimulation<ArtistNodeType>(nodes)
-            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>(links).id((d) => d.id))
-            .force('center', d3.forceCenter(width / 2, height / 2))
-            // .force('charge', d3.forceManyBody().strength(-5))
-            .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
-            //custom force to keep stuff within the boundaries (not sure if this is necessary, look into it)
-            .on('tick', update);
-
     }, [data]);
 
 
