@@ -20,19 +20,7 @@ const ForceDirectedArt = () => {
     });
     const width = 900, height = 900;
 
-    useEffect(() => {
-        if (!data) {
-            return;
-        }
-
-        const svg = d3.select('svg');
-        const artists = data.items;
-
-        const nodes: (Artist & d3.SimulationNodeDatum)[] = artists.map((artist, i) => (
-            { ...artist, index: i }
-        ));
-        const links: GenreLinksType[] = [];
-        
+    const connectionCacheBuilder = (artists: Artist[]) => {
         // Could create a hashmap to track 'sourcetargets: commonGenres' that have already been compared; if they've been compared, just grab their common genre, flip source and target and add it in
         const connectionCache: {[key: string]: string[] | undefined;} = {};
         for (let i = 0; i < artists.length; i++) {
@@ -43,7 +31,7 @@ const ForceDirectedArt = () => {
                 const sortedIDs = [artists[i].id, artists[j].id].sort();
                 const connectionCacheKey = `${sortedIDs[0]}_${sortedIDs[1]}`;
                 const connectionCacheValue = connectionCache[connectionCacheKey];
-
+        
                 if (connectionCacheValue) { // There is a cached connection, no need to duplicate it
                     continue;
                 }
@@ -55,32 +43,43 @@ const ForceDirectedArt = () => {
                 }
             }
         }
+        return connectionCache;
+    };
 
-        const linkNodes = svg
-            .selectAll('line')
-            .data(links)
-            .join('line')
-            .attr('stroke', 'white')
-            .attr('stroke-opacity', 0.6);
+    const showTextOnNode = (show: boolean, id: string) => {
+        const transition = d3.transition()
+            .duration(500)
+            .ease(d3.easeLinear);
 
-        const showTextOnNode = (show: boolean, id: string) => {
-            const transition = d3.transition()
-                .duration(500)
-                .ease(d3.easeLinear);
+        if (show) {
+            d3.select('#text' + id)
+                .transition(transition)
+                .style('opacity', '1');
+        }
+        else {
+            d3.select('#text' + id)
+                .transition(transition)
+                .style('opacity', '0');
+        }
+    };
 
-            if (show) {
-                d3.select('#text' + id)
-                    .transition(transition)
-                    .style('opacity', '1');
-            }
-            else {
-                d3.select('#text' + id)
-                    .transition(transition)
-                    .style('opacity', '0');
-            }
-        };
 
-        const update = () => {
+    useEffect(() => {
+        if (!data) {
+            return;
+        }
+
+        const svg = d3.select('svg');
+        const artists = data.items;
+
+        const nodeData: (Artist & d3.SimulationNodeDatum)[] = artists.map((artist, i) => (
+            { ...artist, index: i }
+        ));
+        let linkData: GenreLinksType[] = [];
+        const connectionCache = connectionCacheBuilder(artists);
+        
+
+        const update = (linkNodes?: d3.Selection<SVGLineElement, GenreLinksType, d3.BaseType, unknown>) => {
             console.log('update');
             artistNodes
                 .attr('x', (d) => {
@@ -95,29 +94,30 @@ const ForceDirectedArt = () => {
                 .attr('x', (d) => d.x!)
                 .attr('y', (d) => d.y!);
 
-            if (links) {
+            if (linkNodes) {
                 linkNodes
-                    .attr('x1', (d) =>  d3.select('#node' + d.source).attr('x'))
-                    .attr('y1', (d) => d3.select('#node' + d.source).attr('y'))
-                    .attr('x2', (d) => d3.select('#node' + d.target).attr('x'))
-                    .attr('y2', (d) => d3.select('#node' + d.target).attr('y'));    
+                    .attr('x1', (d: any) => d.source.x!)
+                    .attr('y1', (d: any) => d.source.y!)
+                    .attr('x2', (d: any) => d.target.x!)
+                    .attr('y2', (d: any) => d.target.y!);
             }
-
         };
 
-
-        const simulation = d3.forceSimulation<ArtistNodeType>(nodes)
-            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>(links).id((d) => d.id))
+        const simulation = d3.forceSimulation<ArtistNodeType>(nodeData)
+            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id))
             .force('center', d3.forceCenter(width / 2, height / 2))
-            // .force('charge', d3.forceManyBody().strength(-5))
+        // .force('charge', d3.forceManyBody().strength(-5))
             .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
-            //custom force to keep stuff within the boundaries (not sure if this is necessary, look into it)
+            //TODO: Add a custom force to keep stuff within the boundaries (not sure if this is necessary, look into it)
             .on('tick', update);
 
 
+        const linkNodes = svg
+            .selectAll('line');
+
         const artistNodes = svg
             .selectAll('image')
-            .data(nodes)
+            .data(nodeData)
             .join('image')
             .attr('id', d => 'node' + d.id)
             .attr('width', (d) => d.popularity * 1.4)
@@ -137,15 +137,16 @@ const ForceDirectedArt = () => {
                 showTextOnNode(false, d.id);
             })
             .on('click', (event, d) => {
-                links.length = 0;
+                linkData = [];
                 simulation.stop();
 
                 const connectionCacheKeys: string[] = Object.keys(connectionCache);
                 for (const connectionCacheKey of connectionCacheKeys) {
                     const containsID = connectionCacheKey.includes(d.id);
-                    if (containsID) {
+                    const commonGenres = connectionCache[connectionCacheKey];
+                    if (containsID && commonGenres) {
                         const targetID = connectionCacheKey.split('_').find((value) => value !== d.id);
-                        links.push({ source: d.id, target: targetID!, commonGenres: connectionCache[connectionCacheKey]! });
+                        linkData.push({ source: d.id, target: targetID!, commonGenres: commonGenres });
                     }
                 }
                 // const convert = (id: string) => {
@@ -154,15 +155,35 @@ const ForceDirectedArt = () => {
                 // links.forEach((link) => {
                 //     console.log(convert(link.source as string), convert(link.target as string), link.commonGenres);
                 // });    
-                        
-                // .attr('stroke-width', d => (d.commonGenres.length ** 2));
-                simulation.restart();
+
+                console.log(linkData);
+                const test1 = linkNodes.data<GenreLinksType>(linkData);
+                console.log(test1, 'test1');
+
+                // // Remove extra nodes that aren't bound to a datum
+                // const test2 = linkNodes.exit().remove();
+                // console.log(test2, 'test2');
+
+                // Add node for datums without one
+                const test3 = test1.enter().append('line')
+                    .attr('stroke', 'white')
+                    .attr('stroke-opacity', 0.6);
+                console.log(test3, 'test3');
+
+                // Update and restart simulation
+                (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
+                simulation.on('tick', () => update(test3));
+                simulation
+                    .alpha(1);
+                simulation
+                    .restart();
+    
             });
 
             
         const textNodes = svg
             .selectAll('text')
-            .data(nodes)
+            .data(nodeData)
             .join('text')
             .attr('id', d => 'text' + d.id)
             .text((d) => d.name)
@@ -182,8 +203,7 @@ const ForceDirectedArt = () => {
             .on('mouseout', (event, d) => {
                 showTextOnNode(false, d.id);
             });
-
-            
+        
     }, [data]);
 
 
