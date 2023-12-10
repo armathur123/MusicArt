@@ -70,6 +70,11 @@ const ForceDirectedArt = () => {
         }
 
         const svg = d3.select('svg');
+        // Add group element for text, nodes, links
+        svg.append('g').attr('id', 'links');
+        svg.append('g').attr('id', 'nodes');
+        svg.append('g').attr('id', 'nodeLabels');
+
         const artists = data.items;
 
         const nodeData: (Artist & d3.SimulationNodeDatum)[] = artists.map((artist, i) => (
@@ -106,16 +111,18 @@ const ForceDirectedArt = () => {
         const simulation = d3.forceSimulation<ArtistNodeType>(nodeData)
             .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id))
             .force('center', d3.forceCenter(width / 2, height / 2))
-        // .force('charge', d3.forceManyBody().strength(-5))
+            .force('charge', d3.forceManyBody().strength(5))
             .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
             //TODO: Add a custom force to keep stuff within the boundaries (not sure if this is necessary, look into it)
             .on('tick', update);
 
 
         const linkNodes = svg
+            .select('#links')
             .selectAll('line');
 
         const artistNodes = svg
+            .select('#nodes')
             .selectAll('image')
             .data(nodeData)
             .join('image')
@@ -123,6 +130,7 @@ const ForceDirectedArt = () => {
             .attr('width', (d) => d.popularity * 1.4)
             .attr('height', (d) => d.popularity * 1.4)
             .attr('xlink:href', (d) => d.images[0].url)
+            .style('z-index', 10)
             .attr('style', 'clip-path: circle(40%);')
             .attr('transform', (d) => `translate(-${d.popularity * 1.4 / 2}, -${d.popularity * 1.4 / 2})`)
             .on('mouseover', (event, d) => {
@@ -167,7 +175,8 @@ const ForceDirectedArt = () => {
                 // Add node for datums without one
                 const test3 = test1.enter().append('line')
                     .attr('stroke', 'white')
-                    .attr('stroke-opacity', 0.6);
+                    .attr('stroke-opacity', 0.6)
+                    .style('z-index', 1);
                 console.log(test3, 'test3');
 
                 // Update and restart simulation
@@ -182,6 +191,7 @@ const ForceDirectedArt = () => {
 
             
         const textNodes = svg
+            .select('#nodeLabels')
             .selectAll('text')
             .data(nodeData)
             .join('text')
