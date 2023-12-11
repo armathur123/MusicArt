@@ -4,8 +4,9 @@ import { spotifyDataEndpoints } from '@/utils/applicationConstants';
 import { useSpotifyApi } from '@/utils/hooks/useSpotifyApi';
 import { Artist } from '@spotify/web-api-ts-sdk';
 import * as d3 from 'd3';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Circle from '../_components/_circle/Circle';
+import styles from './forceDirectArt.module.scss';
 
 type ArtistNodeType = (Artist & d3.SimulationNodeDatum);
 type GenreLinksType = (d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]});
@@ -15,10 +16,40 @@ const ForceDirectedArt = () => {
         method: 'GET',
         params: {
             time_range: 'medium_term',
-            limit: '10'
+            limit: '20'
         }
     });
-    const width = 900, height = 900;
+
+    const [width, setWidth] = useState<number>();
+    const [height, setHeight] = useState<number>();
+    const [selectedArtistID, setSelectedArtistID] = useState<string>();
+    const svgContainer = useRef<any>();
+
+    // This function calculates width and height of the container
+    const getSvgContainerSize = () => {
+        const newWidth = svgContainer.current.clientWidth;
+        setWidth(newWidth);
+
+        const newHeight = svgContainer.current.clientHeight;
+        setHeight(newHeight);
+    };
+
+    // const checkBoundsForce = (d: d3.SimulationNodeDatum) => {
+    //     if (!width || !height) {
+    //         return;
+    //     }
+    //     if (d.x && (d.x < 0 || d.x > width)) d.x *= -1;
+    //     if (d.y && (d.y < 0 || d.y > height)) d.y *= -1;
+
+    //     const force: d3.Force<ArtistNodeType, GenreLinksType> = (alpha: number) => {
+    //         for (let i = 0, n = nodes.length, node, k = alpha * 0.1; i < n; ++i) {
+    //             node = nodes[i];
+    //             node.vx -= node.x * k;
+    //             node.vy -= node.y * k;
+    //         }
+    //     };
+          
+    // };      
 
     const connectionCacheBuilder = (artists: Artist[]) => {
         const allLinks: GenreLinksType[] = [];
@@ -53,21 +84,41 @@ const ForceDirectedArt = () => {
             .duration(500)
             .ease(d3.easeLinear);
 
+        const labelID = `#label_${id}`;
+        const nodeID = `#node_${id}`;
+
         if (show) {
-            d3.select('#text' + id)
+            d3.select(labelID)
                 .transition(transition)
                 .style('opacity', '1');
+            d3.select(nodeID)
+                .transition(transition)
+                .style('filter', 'brightness(70%)');
         }
         else {
-            d3.select('#text' + id)
+            d3.select(labelID)
                 .transition(transition)
                 .style('opacity', '0');
+            
+            d3.select(nodeID)
+                .transition(transition)
+                .style('filter', 'brightness(100%)');
+
         }
     };
 
+    // Resize logic
+    useEffect(() => {
+        // detect 'width' and 'height' on render
+        getSvgContainerSize();
+        // listen for resize changes, and detect dimensions again when they change
+        window.addEventListener('resize', getSvgContainerSize);
+        // cleanup event listener
+        return () => window.removeEventListener('resize', getSvgContainerSize);
+    }, []);
 
     useEffect(() => {
-        if (!data) {
+        if (!data || !height || !width) {
             return;
         }
 
@@ -108,13 +159,16 @@ const ForceDirectedArt = () => {
             }
         };
 
+        // Set up simulation forces
         const simulation = d3.forceSimulation<ArtistNodeType>(nodeData)
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('charge', d3.forceManyBody().strength(30))
+            .force('charge', d3.forceManyBody().strength(50))
             .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
             .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id))
+            .force('x', d3.forceX(width / 2).strength(.1))
+            .force('y', d3.forceY(height / 2).strength(.1))
             //TODO: Add a custom force to keep stuff within the boundaries
-            .on('tick', update);
+            .on('tick', () => update());
 
 
         const artistNodes = svg
@@ -122,7 +176,7 @@ const ForceDirectedArt = () => {
             .selectAll('image')
             .data(nodeData)
             .join('image')
-            .attr('id', d => 'node' + d.id)
+            .attr('id', d => `node_${d.id}`)
             .attr('width', (d) => d.popularity * 1.4)
             .attr('height', (d) => d.popularity * 1.4)
             .attr('xlink:href', (d) => d.images[0].url)
@@ -140,49 +194,51 @@ const ForceDirectedArt = () => {
                 showTextOnNode(false, d.id);
             })
             .on('click', (event, d) => {
-                const linkData: GenreLinksType[] = [];
-                simulation.stop();
+                //this doesn't work, not tracking state changes for some reason. I think that its catching an old reference to the state? idk
+                if (selectedArtistID !== d.id) { 
+                    console.log(selectedArtistID, d.id);
+                    console.log('wut', selectedArtistID !== d.id);
+                    setSelectedArtistID(d.id);
+                    const linkData: GenreLinksType[] = [];
+                    simulation.stop();
 
-                const connectionCacheKeys: string[] = Object.keys(connectionCache);
-                for (const connectionCacheKey of connectionCacheKeys) {
-                    const containsID = connectionCacheKey.includes(d.id);
-                    const commonGenres = connectionCache[connectionCacheKey];
-                    if (containsID && commonGenres) {
-                        const targetID = connectionCacheKey.split('_').find((value) => value !== d.id);
-                        linkData.push({ source: d.id, target: targetID!, commonGenres: commonGenres });
+                    const connectionCacheKeys: string[] = Object.keys(connectionCache);
+                    for (const connectionCacheKey of connectionCacheKeys) {
+                        const containsID = connectionCacheKey.includes(d.id);
+                        const commonGenres = connectionCache[connectionCacheKey];
+                        if (containsID && commonGenres) {
+                            const targetID = connectionCacheKey.split('_').find((value) => value !== d.id);
+                            linkData.push({ source: d.id, target: targetID!, commonGenres: commonGenres });
+                        }
                     }
-                }
 
-                const linkNodesWithData = svg
-                    .select('#links')
-                    .selectAll('line')
-                    .data<GenreLinksType>(linkData);
+                    const linkNodesWithData = svg
+                        .select('#links')
+                        .selectAll('line')
+                        .data<GenreLinksType>(linkData);
                     
-                const linkNodesJoined = linkNodesWithData
-                    .join((enter) => {
-                        console.log(enter, 'enter');
-                        return enter
-                            .append('line')
-                            .attr('id', d => `${d.source}_${d.target}`)
-                            .attr('stroke', 'white ')
-                            .attr('stroke-opacity', 0.6);
-                    },
-                    (update) => {
-                        console.log(update, 'update');
-                        return update;
-                    },
-                    (exit) => {
-                        console.log(exit, 'exit');
-                        return exit.remove();
-                    });
+                    const linkNodesJoined = linkNodesWithData
+                        .join((enter) => {
+                            return enter
+                                .append('line')
+                                .attr('id', d => `${d.source}_${d.target}`)
+                                .attr('stroke', 'white ')
+                                .attr('stroke-opacity', 0.6);
+                        },
+                        (update) => {
+                            return update;
+                        },
+                        (exit) => {
+                            return exit.remove();
+                        });
 
-                // Update and restart simulation
-                (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
-                simulation
-                    .on('tick', () => update(linkNodesJoined))
-                    .alpha(.3)
-                    .restart();
-    
+                    // Update and restart simulation
+                    (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
+                    simulation
+                        .on('tick', () => update(linkNodesJoined))
+                        .alpha(.05)
+                        .restart();
+                }
             });
 
             
@@ -191,7 +247,7 @@ const ForceDirectedArt = () => {
             .selectAll('text')
             .data(nodeData)
             .join('text')
-            .attr('id', d => 'text' + d.id)
+            .attr('id', d => `label_${d.id}`)
             .text((d) => d.name)
             .attr('text-anchor', 'middle')
             .attr('stroke', 'white')
@@ -210,11 +266,11 @@ const ForceDirectedArt = () => {
                 showTextOnNode(false, d.id);
             });
         
-    }, [data]);
+    }, [data, width, height]);
 
 
     return (
-        <div>
+        <div ref={svgContainer} className={styles.spotify_art_container}>
             <svg width={width} height={height}/>
         </div>
     );
