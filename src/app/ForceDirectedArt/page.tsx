@@ -164,7 +164,7 @@ const ForceDirectedArt = () => {
             .force('center', d3.forceCenter(width / 2, height / 2))
             .force('charge', d3.forceManyBody().strength(50))
             .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
-            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id))
+            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id).strength(.5))
             .force('x', d3.forceX(width / 2).strength(.1))
             .force('y', d3.forceY(height / 2).strength(.1))
             //TODO: Add a custom force to keep stuff within the boundaries
@@ -221,16 +221,19 @@ const ForceDirectedArt = () => {
                         .join((enter) => {
                             return enter
                                 .append('line')
-                                .attr('id', d => `${d.source}_${d.target}`)
-                                .attr('stroke', 'white ')
-                                .attr('stroke-opacity', 0.6);
+                                .attr('id', (d: GenreLinksType) => `${d.source}_${d.target}`)
+                                // .transition()
+                                // .duration(950)
+                                .style('stroke', 'white ')
+                                .style('stroke-opacity', 0.6);
+        
                         },
                         (update) => {
                             return update;
                         },
                         (exit) => {
                             return exit.remove();
-                        });
+                        });                         
 
                     // Update and restart simulation
                     (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);

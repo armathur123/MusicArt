@@ -12,13 +12,23 @@ type AuthorizationParametersType = {
     redirect_uri: string;
 }
 
-type AccessTokenParametersType = {
+type AccessTokenParameters = {
+    client_id: string;
+    grant_type: string;
+}
+
+type AccessTokenFromCodeType = {
     client_id: string
-    grant_type: string,
     code: string;
     redirect_uri: string;
     code_verifier: string;
-}
+} & AccessTokenParameters
+
+type AccessTokenFromRefreshTokenType = {
+    refresh_token: string,
+} & AccessTokenParameters
+
+export type TokenResponseType = {access_token: string, expires_in: number, refresh_token: string}
 
 export type SpotifyAuthorizationToken = `Bearer ${string}`
 
@@ -60,25 +70,40 @@ class SpotifyApi {
         // need to set up something for if this login fails
     };
     
-    getAccessToken = async (code: string): Promise<string> => {
+    getAccessToken = async (code: string, isRefreshToken: boolean): Promise<TokenResponseType> => {
+
+        let accessTokenParameters: AccessTokenFromCodeType | AccessTokenFromRefreshTokenType;
         const code_verifier = localStorage.getItem('verifier');
-        const accessTokenParameters: AccessTokenParametersType = {
-            client_id: authorizationConstants.clientID,
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri: authorizationConstants.redirectUri,
-            code_verifier: code_verifier!
-        };
+        if (isRefreshToken){
+            console.log('this is a refresh');
+            accessTokenParameters = {
+                client_id: authorizationConstants.clientID,
+                grant_type: 'refresh_token',
+                refresh_token: code
+            };
+        }
+        else {
+            accessTokenParameters = {
+                client_id: authorizationConstants.clientID,
+                grant_type: 'authorization_code',
+                code,
+                redirect_uri: authorizationConstants.redirectUri,
+                code_verifier: code_verifier!
+            };
+        }
+        // const authorization = base64encode(`${authorizationConstants.clientID}:${authorizationConstants.}`)
         const request = await fetch(authorizationConstants.accessTokenAuthorizationLink, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
+                // 'Authorization': isRefreshToken ?  : ''
             },
             body: new URLSearchParams(accessTokenParameters)
         });
     
-        const { access_token } = await request.json();
-        return access_token;
+        const { access_token, expires_in, refresh_token } = await request.json();
+
+        return { access_token, expires_in, refresh_token };
     };
 
     swapAccessToken = async (code: string): Promise<string> => {
