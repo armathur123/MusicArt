@@ -34,22 +34,32 @@ const ForceDirectedArt = () => {
         setHeight(newHeight);
     };
 
-    // const checkBoundsForce = (d: d3.SimulationNodeDatum) => {
-    //     if (!width || !height) {
-    //         return;
+    // const checkBoundsForce: d3.Force<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>= (width: number, height: number) =>  {
+    //     let nodes: ArtistNodeType[] = [];
+    //     let alphaVal: number = 0;
+    //     for (let i = 0, n = nodes.length; i < n; ++i) {
+    //         const node = nodes[i];
+    //         const xPos = Math.floor(node.x!);
+    //         const yPos = Math.floor(node.y!);
+    //         if (node.x && node.vx && (xPos - (node.popularity * .8) < 0 || xPos + (node.popularity * .8) > width)) node.vx *= -1;
+    //         if (node.y && node.vy && (yPos - (node.popularity * .8) < 0 || yPos + (node.popularity * .8) > height)) node.vy *= -1;
     //     }
-    //     if (d.x && (d.x < 0 || d.x > width)) d.x *= -1;
-    //     if (d.y && (d.y < 0 || d.y > height)) d.y *= -1;
 
-    //     const force: d3.Force<ArtistNodeType, GenreLinksType> = (alpha: number) => {
-    //         for (let i = 0, n = nodes.length, node, k = alpha * 0.1; i < n; ++i) {
-    //             node = nodes[i];
-    //             node.vx -= node.x * k;
-    //             node.vy -= node.y * k;
-    //         }
+    //     const initialize = (_nodes: ArtistNodeType[], random: () => number) => {
+    //         nodes = _nodes;
     //     };
-          
-    // };      
+
+    //     const alpha = (_alpha: number) => {
+    //         alphaVal = _alpha;
+    //     };
+
+    //     return {
+    //         initialize,
+    //         alpha
+    //     };
+    // };
+
+
 
     const connectionCacheBuilder = (artists: Artist[]) => {
         const allLinks: GenreLinksType[] = [];
@@ -137,7 +147,7 @@ const ForceDirectedArt = () => {
 
         // Runs on every tick of simulation animation; update nodes / links position
         const update = (linkNodes?: d3.Selection<d3.BaseType, GenreLinksType, d3.BaseType, unknown>) => {
-            console.log('update');
+            // console.log('update');
             artistNodes
                 .attr('x', (d) => {
                     return d.x ?? width / 2;
@@ -165,6 +175,19 @@ const ForceDirectedArt = () => {
             .force('charge', d3.forceManyBody().strength(50))
             .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
             .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id).strength(.5))
+            .force('bounds', () => {
+                nodeData.forEach((node) => {
+                    if (node.x && node.y && node.vy && node.vx) {
+                        const xPos = Math.floor(node.x + node.vx);
+                        const yPos = Math.floor(node.y + node.vy);
+                        if (xPos - (node.popularity * .8) < 0 || xPos + (node.popularity * .8) > width) node.vx *= -1;
+                        if (yPos - (node.popularity * .8) < 0 || yPos + (node.popularity * .8) > height) node.vy *= -1;    
+                    }
+                    else {
+                        console.log('issue');
+                    }
+                });
+            })
             .force('x', d3.forceX(width / 2).strength(.1))
             .force('y', d3.forceY(height / 2).strength(.1))
             //TODO: Add a custom force to keep stuff within the boundaries
@@ -196,8 +219,8 @@ const ForceDirectedArt = () => {
             .on('click', (event, d) => {
                 //this doesn't work, not tracking state changes for some reason. I think that its catching an old reference to the state? idk
                 if (selectedArtistID !== d.id) { 
-                    console.log(selectedArtistID, d.id);
-                    console.log('wut', selectedArtistID !== d.id);
+                    // console.log(selectedArtistID, d.id);
+                    // console.log('wut', selectedArtistID !== d.id);
                     setSelectedArtistID(d.id);
                     const linkData: GenreLinksType[] = [];
                     simulation.stop();

@@ -75,7 +75,6 @@ class SpotifyApi {
         let accessTokenParameters: AccessTokenFromCodeType | AccessTokenFromRefreshTokenType;
         const code_verifier = localStorage.getItem('verifier');
         if (isRefreshToken){
-            console.log('this is a refresh');
             accessTokenParameters = {
                 client_id: authorizationConstants.clientID,
                 grant_type: 'refresh_token',
