@@ -133,25 +133,27 @@ const ForceDirectedArt = () => {
         if (!data || !height || !width) {
             return;
         }
+        // Remove all elements in svg before redrawing
+        d3.selectAll('svg > *').remove();
+
 
         const svg = d3.select('svg');
+
         // Add group element for text, nodes, links; order determines what shows first
         svg.append('g').attr('id', 'links');
         svg.append('g').attr('id', 'nodes');
         svg.append('g').attr('id', 'nodeLabels');
 
         // Scales (Domain is the scale of values to pass in; range is the scale of values that will be output)
-
-        const getRadiusFromPopularity = (popularity: number, numberOfNodes: number): number => {
+        const getScaledDimensionValue = (value: number, domain: number[], dimensionScale: number): number => {
             
-            const widthScale = d3.scaleLinear().domain([0, 100]).range([0, width / 9 ]);
-            const heightScale = d3.scaleLinear([0, 100]).range([0, height / 9]);
-            return Math.floor(Math.min(...[widthScale(popularity), heightScale(popularity)]));
+            const scale = d3.scaleLinear().domain(domain).range([0, Math.min(width * dimensionScale, height * dimensionScale)]);
+            return scale(value);
         };
 
         const artists = data.items;
         const nodeData: ArtistNodeType[] = artists.map((artist, i) => (
-            { ...artist, index: i, radius: getRadiusFromPopularity(artist.popularity, artists.length) }
+            { ...artist, index: i, radius: getScaledDimensionValue(artist.popularity, [0, 100], .2) }
         ));
 
         const { connectionCache, allLinks } = connectionCacheBuilder(artists);
@@ -185,7 +187,7 @@ const ForceDirectedArt = () => {
             .force('charge', d3.forceManyBody().strength(30))
             .force('center', d3.forceCenter(width / 2, height / 2))
             .force('collide', d3.forceCollide<ArtistNodeType>().radius((d) => {return d.radius / 2;}))
-            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id).strength(.5))
+            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>(allLinks).id((d) => d.id).strength(.5))
             .force('bounds', checkBoundsForce(width, height))
             .force('x', d3.forceX(width / 2).strength(.1))
             .force('y', d3.forceY(height / 2).strength(.1))
@@ -279,12 +281,14 @@ const ForceDirectedArt = () => {
             .attr('text-anchor', 'middle')
             .attr('stroke', 'white')
             .attr('fill', 'white')
-            .attr('stroke-width', '1px')
+            // .attr('stroke-width', '1px')
             .attr('alignment-baseline', 'middle')
             .attr('lengthAdjust', 'spacingAndGlyphs')
-            .style('font-size', (d) => 14)
-            .style('font-weight', '200')
-            .style('textLength', (d) => d.radius * .7)
+            .style('font-size', (d) =>  getScaledDimensionValue(d.popularity, [0, 100], .03))
+            // .attr('font-weight', (d) => getScaledDimensionValue(d.radius, [0, 100], .02))
+            .style('position', 'absolute')
+            .style('letter-spacing', 1.3)
+            .style('textLength', (d) => d.popularity)
             .style('opacity', '0')
             .on('mouseover', (event, d) => {
                 showTextOnNode(true, d.id);
