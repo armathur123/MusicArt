@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import Circle from '../_components/_circle/Circle';
 import styles from './forceDirectArt.module.scss';
 
-type ArtistNodeType = (Artist & d3.SimulationNodeDatum);
+type ArtistNodeType = (Artist & d3.SimulationNodeDatum & {radius: number});
 type GenreLinksType = (d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]});
 
 const ForceDirectedArt = () => {
@@ -43,15 +43,13 @@ const ForceDirectedArt = () => {
                 const node = nodes[i];
                 const xPos = Math.floor(node.x!);
                 const yPos = Math.floor(node.y!);
-                if (node.x && node.vx && (xPos - (node.popularity * .8) < 0 || xPos + (node.popularity * .8) > width)) {
-                    console.log(node.name, 'hitX');
+                if (node.x && node.vx && (xPos - (node.radius) < 0 || xPos + (node.radius) > width)) {
                     node.vx *= -1;
-                    node.x += (node.vx + node.vx > 0 ? node.popularity * -1 : node.popularity) * k;
+                    node.x += (node.vx + node.vx > 0 ? node.radius * -1 : node.radius) * k;
                 }
-                if (node.y && node.vy && (yPos - (node.popularity * .8) < 0 || yPos + (node.popularity * .8) > height)) {
-                    console.log(node.name, 'hitY');
+                if (node.y && node.vy && (yPos - (node.radius) < 0 || yPos + (node.radius) > height)) {
                     node.vy *= -1;
-                    node.y += (node.vy + node.vy > 0 ? node.popularity * -1 : node.popularity) * k;
+                    node.y += (node.vy + node.vy > 0 ? node.radius * -1 : node.radius) * k;
                 }
             }
         };
@@ -144,14 +142,16 @@ const ForceDirectedArt = () => {
 
         // Scales (Domain is the scale of values to pass in; range is the scale of values that will be output)
 
-        const getRadiusFromPopularity = (popularity: number) => {
-            const widthScale = d3.scaleLinear().range([0, width]);
-            const rangeScale = d3.scaleLinear().range([0, height]);    
+        const getRadiusFromPopularity = (popularity: number, numberOfNodes: number): number => {
+            
+            const widthScale = d3.scaleLinear().domain([0, 100]).range([0, width / 9 ]);
+            const heightScale = d3.scaleLinear([0, 100]).range([0, height / 9]);
+            return Math.floor(Math.min(...[widthScale(popularity), heightScale(popularity)]));
         };
 
         const artists = data.items;
-        const nodeData: (Artist & d3.SimulationNodeDatum)[] = artists.map((artist, i) => (
-            { ...artist, index: i }
+        const nodeData: ArtistNodeType[] = artists.map((artist, i) => (
+            { ...artist, index: i, radius: getRadiusFromPopularity(artist.popularity, artists.length) }
         ));
 
         const { connectionCache, allLinks } = connectionCacheBuilder(artists);
@@ -182,14 +182,13 @@ const ForceDirectedArt = () => {
 
         // Set up simulation forces
         const simulation = d3.forceSimulation<ArtistNodeType>(nodeData)
+            .force('charge', d3.forceManyBody().strength(30))
             .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('charge', d3.forceManyBody().strength(50))
-            .force('collide', d3.forceCollide<(Artist & d3.SimulationNodeDatum)>().radius((d) => {return d.popularity * .8;}))
+            .force('collide', d3.forceCollide<ArtistNodeType>().radius((d) => {return d.radius / 2;}))
             .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id).strength(.5))
             .force('bounds', checkBoundsForce(width, height))
             .force('x', d3.forceX(width / 2).strength(.1))
             .force('y', d3.forceY(height / 2).strength(.1))
-            //TODO: Add a custom force to keep stuff within the boundaries
             .on('tick', () => update());
 
 
@@ -199,11 +198,11 @@ const ForceDirectedArt = () => {
             .data(nodeData)
             .join('image')
             .attr('id', d => `node_${d.id}`)
-            .attr('width', (d) => d.popularity * 1.4)
-            .attr('height', (d) => d.popularity * 1.4)
+            .attr('width', (d) => d.radius)
+            .attr('height', (d) => d.radius)
             .attr('xlink:href', (d) => d.images[0].url)
             .attr('style', 'clip-path: circle(40%);')
-            .attr('transform', (d) => `translate(-${d.popularity * 1.4 / 2}, -${d.popularity * 1.4 / 2})`)
+            .attr('transform', (d) => `translate(-${d.radius / 2}, -${d.radius / 2})`)
             .on('mouseover', (event, d) => {
                 // how to select 'this' with anonymous arrow function :)
                 // d3.select(event.target).transition()
@@ -216,6 +215,7 @@ const ForceDirectedArt = () => {
                 showTextOnNode(false, d.id);
             })
             .on('click', (event, d) => {
+                console.log('clicked', d.name);
                 //this doesn't work, not tracking state changes for some reason. I think that its catching an old reference to the state? idk
                 if (selectedArtistID !== d.id) { 
                     // console.log(selectedArtistID, d.id);
@@ -259,6 +259,8 @@ const ForceDirectedArt = () => {
 
                     // Update and restart simulation
                     (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
+
+                    // Maybe add a force that centers selected node?
                     simulation
                         .on('tick', () => update(linkNodesJoined))
                         .alpha(.05)
@@ -282,7 +284,7 @@ const ForceDirectedArt = () => {
             .attr('lengthAdjust', 'spacingAndGlyphs')
             .style('font-size', (d) => 14)
             .style('font-weight', '200')
-            .style('textLength', (d) => d.popularity * .7)
+            .style('textLength', (d) => d.radius * .7)
             .style('opacity', '0')
             .on('mouseover', (event, d) => {
                 showTextOnNode(true, d.id);
