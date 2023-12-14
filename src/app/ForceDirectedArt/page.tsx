@@ -8,8 +8,9 @@ import { useEffect, useRef, useState } from 'react';
 import Circle from '../_components/_circle/Circle';
 import styles from './forceDirectArt.module.scss';
 
-type ArtistNodeType = (Artist & d3.SimulationNodeDatum & {radius: number});
-type GenreLinksType = (d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]});
+type ArtistNodeType = Artist & d3.SimulationNodeDatum & {radius: number}
+type GenreLinksType = d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]};
+type D3ForceGraphElement<T> = d3.Selection<d3.BaseType | SVGTextElement, T, d3.BaseType, unknown>
 type ConnectionCacheType = ( {[key: string]: string[] | undefined;})
 
 const ForceDirectedArt = () => {
@@ -21,11 +22,19 @@ const ForceDirectedArt = () => {
         }
     });
 
-    const [width, setWidth] = useState<number>(0);
-    const [height, setHeight] = useState<number>(0);
-    const [selectedArtistID, setSelectedArtistID] = useState<string>();
     const svgContainer = useRef<any>();
     const svg = d3.select('svg');
+
+    const [width, setWidth] = useState<number>(0);
+    const [height, setHeight] = useState<number>(0);
+    const selectedArtistID = useRef<string>();
+
+    const [nodeData, setNodeData] = useState<ArtistNodeType[]>();
+    const [connectionCache, setConnectionCache] = useState<ConnectionCacheType>();
+    const [simulation, setSimulation] = useState<d3.Simulation<ArtistNodeType, GenreLinksType>>();
+    const [nodes, setNodes] = useState<D3ForceGraphElement<ArtistNodeType>>();
+    const [nodeLabels, setNodeLabels] = useState<D3ForceGraphElement<ArtistNodeType>>();
+    const [links, setLinks] = useState<D3ForceGraphElement<GenreLinksType>>();
 
     // This function calculates width and height of the container
     const getSvgContainerSize = () => {
@@ -35,35 +44,6 @@ const ForceDirectedArt = () => {
         const newHeight = svgContainer.current.clientHeight;
         setHeight(newHeight);
     };
-
-    const checkBoundsForce = (width: number, height: number) =>  {
-        let nodes: ArtistNodeType[] = [];
-
-        const force: d3.Force<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>> = (alpha: number) => {
-            const k = alpha * 1.5;
-            for (let i = 0, n = nodes.length; i < n; ++i) {
-                const node = nodes[i];
-                const xPos = Math.floor(node.x!);
-                const yPos = Math.floor(node.y!);
-                if (node.x && node.vx && (xPos - (node.radius) < 0 || xPos + (node.radius) > width)) {
-                    node.vx *= -1;
-                    node.x += (node.vx + node.vx > 0 ? node.radius * -1 : node.radius) * k;
-                }
-                if (node.y && node.vy && (yPos - (node.radius) < 0 || yPos + (node.radius) > height)) {
-                    node.vy *= -1;
-                    node.y += (node.vy + node.vy > 0 ? node.radius * -1 : node.radius) * k;
-                }
-            }
-        };
-
-        force.initialize = (_nodes) => {
-            nodes = _nodes;
-        };
-        
-        return force;
-    };
-
-
 
     const connectionCacheBuilder = (artists: Artist[]) => {
         const allLinks: GenreLinksType[] = [];
@@ -93,6 +73,34 @@ const ForceDirectedArt = () => {
         return { connectionCache, allLinks };
     };
 
+    // Custom force that keeps nodes within height / width constraints
+    const checkBoundsForce = (width: number, height: number) =>  {
+        let nodes: ArtistNodeType[] = [];
+    
+        const force: d3.Force<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>> = (alpha: number) => {
+            const k = alpha * 1.5;
+            for (let i = 0, n = nodes.length; i < n; ++i) {
+                const node = nodes[i];
+                const xPos = Math.floor(node.x!);
+                const yPos = Math.floor(node.y!);
+                if (node.x && node.vx && (xPos - (node.radius) < 0 || xPos + (node.radius) > width)) {
+                    node.vx *= -1;
+                    node.x += (node.vx + node.vx > 0 ? node.radius * -1 : node.radius) * k;
+                }
+                if (node.y && node.vy && (yPos - (node.radius) < 0 || yPos + (node.radius) > height)) {
+                    node.vy *= -1;
+                    node.y += (node.vy + node.vy > 0 ? node.radius * -1 : node.radius) * k;
+                }
+            }
+        };
+    
+        force.initialize = (_nodes) => {
+            nodes = _nodes;
+        };
+        
+        return force;
+    };
+
     const showTextOnNode = (show: boolean, id: string) => {
         const transition = d3.transition()
             .duration(500)
@@ -117,12 +125,11 @@ const ForceDirectedArt = () => {
             d3.select(nodeID)
                 .transition(transition)
                 .style('filter', 'brightness(100%)');
-
         }
     };
 
     // Runs on every tick of simulation animation; update nodes / links position
-    const update = (artistNodes: d3.Selection<d3.BaseType | SVGImageElement, ArtistNodeType, d3.BaseType, unknown>, textNodes: d3.Selection<d3.BaseType | SVGTextElement, ArtistNodeType, d3.BaseType, unknown> , linkNodes?: d3.Selection<d3.BaseType, GenreLinksType, d3.BaseType, unknown>) => {
+    const update = (artistNodes: D3ForceGraphElement<ArtistNodeType>, textNodes: D3ForceGraphElement<ArtistNodeType>, linkNodes?: D3ForceGraphElement<GenreLinksType>) => {
 
         console.log(artistNodes, textNodes, 'update');
         artistNodes
@@ -147,16 +154,18 @@ const ForceDirectedArt = () => {
     };
     
 
-    const onNodeClick = (d: ArtistNodeType, simulation: d3.Simulation<ArtistNodeType, GenreLinksType>, connectionCache: ConnectionCacheType, nodeData: ArtistNodeType[]) => {
-        console.log('clicked', d.name, simulation, connectionCache, nodeData);
+    const generateNodeLinksByGenre = (d: ArtistNodeType, simulation: d3.Simulation<ArtistNodeType, GenreLinksType>, connectionCache: ConnectionCacheType) => {
+        console.log('clicked', selectedArtistID.current, d.id);
 
         //this doesn't work, not tracking state changes for some reason. I think that its catching an old reference to the state? idk
-        if (selectedArtistID !== d.id) { 
+        if (selectedArtistID.current !== d.id) { 
             // console.log(selectedArtistID, d.id);
             // console.log('wut', selectedArtistID !== d.id);
-            setSelectedArtistID(d.id);
+            selectedArtistID.current === d.id;
             const linkData: GenreLinksType[] = [];
             simulation.stop();
+
+
 
             const connectionCacheKeys: string[] = Object.keys(connectionCache);
             for (const connectionCacheKey of connectionCacheKeys) {
@@ -194,21 +203,28 @@ const ForceDirectedArt = () => {
             // Update and restart simulation
             (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
 
+            const nodes: d3.Selection<d3.BaseType, ArtistNodeType, d3.BaseType, unknown> = d3.select('#nodes').selectAll('image');
+            const text: d3.Selection<d3.BaseType, ArtistNodeType, d3.BaseType, unknown> = d3.select('#nodeLabels').selectAll('text');        
+
             // Maybe add a force that centers selected node?
             simulation
-                .on('tick', () => update(d3.select('#nodes').selectAll('image'), d3.select('#nodelabels').selectAll('text'), linkNodesJoined))
+                .on('tick', () => update(nodes, text, linkNodesJoined))
                 .alpha(.05)
                 .restart();
         }
     };
 
+    // Scales (Domain is the scale of values to pass in; range is the scale of values that will be output)
+    const getScaledDimensionValue = (value: number, domain: number[], dimensionScale: number): number => {
+        const scale = d3.scaleLinear().domain(domain).range([0, Math.min(width * dimensionScale, height * dimensionScale)]);
+        return scale(value);
+    };
+    
     // Resize logic
     useEffect(() => {
-        // detect 'width' and 'height' on render
         getSvgContainerSize();
         // listen for resize changes, and detect dimensions again when they change
         window.addEventListener('resize', getSvgContainerSize);
-        // cleanup event listener
         return () => window.removeEventListener('resize', getSvgContainerSize);
     }, []);
 
@@ -227,36 +243,30 @@ const ForceDirectedArt = () => {
         svg.append('g')
             .attr('id', 'nodeLabels');
 
-        // Scales (Domain is the scale of values to pass in; range is the scale of values that will be output)
-        const getScaledDimensionValue = (value: number, domain: number[], dimensionScale: number): number => {
-            
-            const scale = d3.scaleLinear().domain(domain).range([0, Math.min(width * dimensionScale, height * dimensionScale)]);
-            return scale(value);
-        };
-
         const artists = data.items;
-        const nodeData: ArtistNodeType[] = artists.map((artist, i) => (
+        const nodeDataInit: ArtistNodeType[] = artists.map((artist, i) => (
             { ...artist, index: i, radius: getScaledDimensionValue(artist.popularity, [0, 100], .2) }
         ));
 
         const { connectionCache, allLinks } = connectionCacheBuilder(artists);
 
+
         // Set up simulation forces
-        const simulation: d3.Simulation<ArtistNodeType, GenreLinksType> = d3.forceSimulation<ArtistNodeType>(nodeData)
+        const simulationInit: d3.Simulation<ArtistNodeType, GenreLinksType> = d3.forceSimulation<ArtistNodeType>(nodeDataInit)
             .force('charge', d3.forceManyBody().strength(30))
             .force('center', d3.forceCenter(width / 2, height / 2))
             .force('collide', d3.forceCollide<ArtistNodeType>().radius((d) => {return d.radius / 2;}))
-            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>(allLinks).id((d) => d.id).strength(.5))
+            .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id).strength(.5))
             .force('bounds', checkBoundsForce(width, height))
             .force('x', d3.forceX(width / 2).strength(.1))
             .force('y', d3.forceY(height / 2).strength(.1))
-            .on('tick', () => update(artistNodes, textNodes));
+            .on('tick', () => update(artistNodesInit, artistNodeLabels));
 
 
-        const artistNodes = svg
+        const artistNodesInit = svg
             .select('#nodes')
             .selectAll('image')
-            .data(nodeData)
+            .data(nodeDataInit)
             .join('image')
             .attr('id', d => `node_${d.id}`)
             .attr('width', (d) => d.radius)
@@ -274,14 +284,13 @@ const ForceDirectedArt = () => {
             })
             .on('mouseout', (event, d) => {
                 showTextOnNode(false, d.id);
-            })
-            .on('click', (event, d) => onNodeClick(d, simulation, connectionCache, nodeData));
+            });
 
             
-        const textNodes = svg
+        const artistNodeLabels = svg
             .select('#nodeLabels')
             .selectAll('text')
-            .data(nodeData)
+            .data(nodeDataInit)
             .join('text')
             .attr('id', d => `label_${d.id}`)
             .attr('text-anchor', 'middle')
@@ -303,8 +312,24 @@ const ForceDirectedArt = () => {
             .on('mouseout', (event, d) => {
                 showTextOnNode(false, d.id);
             });
-        
+
+        setConnectionCache(connectionCache);
+        setNodeData(nodeDataInit);
+        setSimulation(simulationInit);
+        setNodes(artistNodesInit);
+        setNodeLabels(artistNodeLabels);
+
     }, [data, width, height]);
+
+    useEffect(() => {
+        if (!nodeData || !simulation || !connectionCache || !nodes) {
+            return;
+        }
+        
+        nodes
+            .on('click', (event, d) => generateNodeLinksByGenre(d, simulation, connectionCache));
+
+    }, [simulation, nodeData, connectionCache]);
 
 
     return (
