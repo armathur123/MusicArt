@@ -27,7 +27,6 @@ const ForceDirectedArt = () => {
 
     const [width, setWidth] = useState<number>(0);
     const [height, setHeight] = useState<number>(0);
-    const selectedArtistID = useRef<string>();
 
     const [nodeData, setNodeData] = useState<ArtistNodeType[]>();
     const [connectionCache, setConnectionCache] = useState<ConnectionCacheType>();
@@ -35,6 +34,7 @@ const ForceDirectedArt = () => {
     const [nodes, setNodes] = useState<D3ForceGraphElement<ArtistNodeType>>();
     const [nodeLabels, setNodeLabels] = useState<D3ForceGraphElement<ArtistNodeType>>();
     const [links, setLinks] = useState<D3ForceGraphElement<GenreLinksType>>();
+    const [selectedArtist, setSelectedArtist] = useState<ArtistNodeType>();
 
     // This function calculates width and height of the container
     const getSvgContainerSize = () => {
@@ -131,7 +131,6 @@ const ForceDirectedArt = () => {
     // Runs on every tick of simulation animation; update nodes / links position
     const update = (artistNodes: D3ForceGraphElement<ArtistNodeType>, textNodes: D3ForceGraphElement<ArtistNodeType>, linkNodes?: D3ForceGraphElement<GenreLinksType>) => {
 
-        console.log(artistNodes, textNodes, 'update');
         artistNodes
             .attr('x', (d) => {
                 return d.x ?? width / 2;
@@ -155,17 +154,15 @@ const ForceDirectedArt = () => {
     
 
     const generateNodeLinksByGenre = (d: ArtistNodeType, simulation: d3.Simulation<ArtistNodeType, GenreLinksType>, connectionCache: ConnectionCacheType) => {
-        console.log('clicked', selectedArtistID.current, d.id);
+        console.log('clicked', selectedArtist?.id, d.id);
 
         //this doesn't work, not tracking state changes for some reason. I think that its catching an old reference to the state? idk
-        if (selectedArtistID.current !== d.id) { 
+        if (!selectedArtist || selectedArtist.id !== d.id) { 
             // console.log(selectedArtistID, d.id);
             // console.log('wut', selectedArtistID !== d.id);
-            selectedArtistID.current === d.id;
             const linkData: GenreLinksType[] = [];
             simulation.stop();
-
-
+            setSelectedArtist(() => d);
 
             const connectionCacheKeys: string[] = Object.keys(connectionCache);
             for (const connectionCacheKey of connectionCacheKeys) {
@@ -326,10 +323,12 @@ const ForceDirectedArt = () => {
             return;
         }
         
+        console.log(selectedArtist, 'changeds');
+
         nodes
             .on('click', (event, d) => generateNodeLinksByGenre(d, simulation, connectionCache));
 
-    }, [simulation, nodeData, connectionCache]);
+    }, [simulation, nodeData, connectionCache, selectedArtist]);
 
 
     return (
