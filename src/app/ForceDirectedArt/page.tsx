@@ -10,6 +10,7 @@ import styles from './forceDirectArt.module.scss';
 
 type ArtistNodeType = (Artist & d3.SimulationNodeDatum & {radius: number});
 type GenreLinksType = (d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]});
+type ConnectionCacheType = ( {[key: string]: string[] | undefined;})
 
 const ForceDirectedArt = () => {
     const { data, loading, error } = useSpotifyApi<{items: Artist[]}>(spotifyDataEndpoints.getUsersTop.artist, {
@@ -20,10 +21,11 @@ const ForceDirectedArt = () => {
         }
     });
 
-    const [width, setWidth] = useState<number>();
-    const [height, setHeight] = useState<number>();
+    const [width, setWidth] = useState<number>(0);
+    const [height, setHeight] = useState<number>(0);
     const [selectedArtistID, setSelectedArtistID] = useState<string>();
     const svgContainer = useRef<any>();
+    const svg = d3.select('svg');
 
     // This function calculates width and height of the container
     const getSvgContainerSize = () => {
@@ -67,7 +69,7 @@ const ForceDirectedArt = () => {
         const allLinks: GenreLinksType[] = [];
         // Could create a hashmap to track 'sourcetargets: commonGenres' that have already been compared; 
         // if they've been compared, just grab their common genre, flip source and target and add it in
-        const connectionCache: {[key: string]: string[] | undefined;} = {};
+        const connectionCache: ConnectionCacheType = {};
         for (let i = 0; i < artists.length; i++) {
             for (let j= 0; j < artists.length; j++) {
                 if (i === j) { // No need to compare artists against themselves
@@ -119,6 +121,87 @@ const ForceDirectedArt = () => {
         }
     };
 
+    // Runs on every tick of simulation animation; update nodes / links position
+    const update = (artistNodes: d3.Selection<d3.BaseType | SVGImageElement, ArtistNodeType, d3.BaseType, unknown>, textNodes: d3.Selection<d3.BaseType | SVGTextElement, ArtistNodeType, d3.BaseType, unknown> , linkNodes?: d3.Selection<d3.BaseType, GenreLinksType, d3.BaseType, unknown>) => {
+
+        console.log(artistNodes, textNodes, 'update');
+        artistNodes
+            .attr('x', (d) => {
+                return d.x ?? width / 2;
+            })
+            .attr('y', (d) => {
+                return d.y ?? height / 2;
+            });
+    
+        textNodes
+            .attr('x', (d) => d.x!)
+            .attr('y', (d) => d.y!);
+    
+        if (linkNodes) {
+            linkNodes
+                .attr('x1', (d) => (d.source as ArtistNodeType).x!)
+                .attr('y1', (d) => (d.source as ArtistNodeType).y!)
+                .attr('x2', (d) => (d.target as ArtistNodeType).x!)
+                .attr('y2', (d) => (d.target as ArtistNodeType).y!);
+        }
+    };
+    
+
+    const onNodeClick = (d: ArtistNodeType, simulation: d3.Simulation<ArtistNodeType, GenreLinksType>, connectionCache: ConnectionCacheType, nodeData: ArtistNodeType[]) => {
+        console.log('clicked', d.name, simulation, connectionCache, nodeData);
+
+        //this doesn't work, not tracking state changes for some reason. I think that its catching an old reference to the state? idk
+        if (selectedArtistID !== d.id) { 
+            // console.log(selectedArtistID, d.id);
+            // console.log('wut', selectedArtistID !== d.id);
+            setSelectedArtistID(d.id);
+            const linkData: GenreLinksType[] = [];
+            simulation.stop();
+
+            const connectionCacheKeys: string[] = Object.keys(connectionCache);
+            for (const connectionCacheKey of connectionCacheKeys) {
+                const containsID = connectionCacheKey.includes(d.id);
+                const commonGenres = connectionCache[connectionCacheKey];
+                if (containsID && commonGenres) {
+                    const targetID = connectionCacheKey.split('_').find((value) => value !== d.id);
+                    linkData.push({ source: d.id, target: targetID!, commonGenres: commonGenres });
+                }
+            }
+
+            const linkNodesWithData = svg
+                .select('#links')
+                .selectAll('line')
+                .data<GenreLinksType>(linkData);
+            
+            const linkNodesJoined = linkNodesWithData
+                .join((enter) => {
+                    return enter
+                        .append('line')
+                        .attr('id', (d: GenreLinksType) => `${d.source}_${d.target}`)
+                        // .transition()
+                        // .duration(950)
+                        .style('stroke', 'white ')
+                        .style('stroke-opacity', 0.6);
+
+                },
+                (update) => {
+                    return update;
+                },
+                (exit) => {
+                    return exit.remove();
+                });                         
+
+            // Update and restart simulation
+            (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
+
+            // Maybe add a force that centers selected node?
+            simulation
+                .on('tick', () => update(d3.select('#nodes').selectAll('image'), d3.select('#nodelabels').selectAll('text'), linkNodesJoined))
+                .alpha(.05)
+                .restart();
+        }
+    };
+
     // Resize logic
     useEffect(() => {
         // detect 'width' and 'height' on render
@@ -136,13 +219,13 @@ const ForceDirectedArt = () => {
         // Remove all elements in svg before redrawing
         d3.selectAll('svg > *').remove();
 
-
-        const svg = d3.select('svg');
-
         // Add group element for text, nodes, links; order determines what shows first
-        svg.append('g').attr('id', 'links');
-        svg.append('g').attr('id', 'nodes');
-        svg.append('g').attr('id', 'nodeLabels');
+        svg.append('g')
+            .attr('id', 'links');
+        svg.append('g')
+            .attr('id', 'nodes');
+        svg.append('g')
+            .attr('id', 'nodeLabels');
 
         // Scales (Domain is the scale of values to pass in; range is the scale of values that will be output)
         const getScaledDimensionValue = (value: number, domain: number[], dimensionScale: number): number => {
@@ -158,32 +241,8 @@ const ForceDirectedArt = () => {
 
         const { connectionCache, allLinks } = connectionCacheBuilder(artists);
 
-        // Runs on every tick of simulation animation; update nodes / links position
-        const update = (linkNodes?: d3.Selection<d3.BaseType, GenreLinksType, d3.BaseType, unknown>) => {
-            // console.log('update');
-            artistNodes
-                .attr('x', (d) => {
-                    return d.x ?? width / 2;
-                })
-                .attr('y', (d) => {
-                    return d.y ?? height / 2;
-                });
-
-            textNodes
-                .attr('x', (d) => d.x!)
-                .attr('y', (d) => d.y!);
-
-            if (linkNodes) {
-                linkNodes
-                    .attr('x1', (d) => (d.source as ArtistNodeType).x!)
-                    .attr('y1', (d) => (d.source as ArtistNodeType).y!)
-                    .attr('x2', (d) => (d.target as ArtistNodeType).x!)
-                    .attr('y2', (d) => (d.target as ArtistNodeType).y!);
-            }
-        };
-
         // Set up simulation forces
-        const simulation = d3.forceSimulation<ArtistNodeType>(nodeData)
+        const simulation: d3.Simulation<ArtistNodeType, GenreLinksType> = d3.forceSimulation<ArtistNodeType>(nodeData)
             .force('charge', d3.forceManyBody().strength(30))
             .force('center', d3.forceCenter(width / 2, height / 2))
             .force('collide', d3.forceCollide<ArtistNodeType>().radius((d) => {return d.radius / 2;}))
@@ -191,7 +250,7 @@ const ForceDirectedArt = () => {
             .force('bounds', checkBoundsForce(width, height))
             .force('x', d3.forceX(width / 2).strength(.1))
             .force('y', d3.forceY(height / 2).strength(.1))
-            .on('tick', () => update());
+            .on('tick', () => update(artistNodes, textNodes));
 
 
         const artistNodes = svg
@@ -216,59 +275,7 @@ const ForceDirectedArt = () => {
             .on('mouseout', (event, d) => {
                 showTextOnNode(false, d.id);
             })
-            .on('click', (event, d) => {
-                console.log('clicked', d.name);
-                //this doesn't work, not tracking state changes for some reason. I think that its catching an old reference to the state? idk
-                if (selectedArtistID !== d.id) { 
-                    // console.log(selectedArtistID, d.id);
-                    // console.log('wut', selectedArtistID !== d.id);
-                    setSelectedArtistID(d.id);
-                    const linkData: GenreLinksType[] = [];
-                    simulation.stop();
-
-                    const connectionCacheKeys: string[] = Object.keys(connectionCache);
-                    for (const connectionCacheKey of connectionCacheKeys) {
-                        const containsID = connectionCacheKey.includes(d.id);
-                        const commonGenres = connectionCache[connectionCacheKey];
-                        if (containsID && commonGenres) {
-                            const targetID = connectionCacheKey.split('_').find((value) => value !== d.id);
-                            linkData.push({ source: d.id, target: targetID!, commonGenres: commonGenres });
-                        }
-                    }
-
-                    const linkNodesWithData = svg
-                        .select('#links')
-                        .selectAll('line')
-                        .data<GenreLinksType>(linkData);
-                    
-                    const linkNodesJoined = linkNodesWithData
-                        .join((enter) => {
-                            return enter
-                                .append('line')
-                                .attr('id', (d: GenreLinksType) => `${d.source}_${d.target}`)
-                                // .transition()
-                                // .duration(950)
-                                .style('stroke', 'white ')
-                                .style('stroke-opacity', 0.6);
-        
-                        },
-                        (update) => {
-                            return update;
-                        },
-                        (exit) => {
-                            return exit.remove();
-                        });                         
-
-                    // Update and restart simulation
-                    (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
-
-                    // Maybe add a force that centers selected node?
-                    simulation
-                        .on('tick', () => update(linkNodesJoined))
-                        .alpha(.05)
-                        .restart();
-                }
-            });
+            .on('click', (event, d) => onNodeClick(d, simulation, connectionCache, nodeData));
 
             
         const textNodes = svg
@@ -277,19 +284,19 @@ const ForceDirectedArt = () => {
             .data(nodeData)
             .join('text')
             .attr('id', d => `label_${d.id}`)
-            .text((d) => d.name)
             .attr('text-anchor', 'middle')
             .attr('stroke', 'white')
             .attr('fill', 'white')
             // .attr('stroke-width', '1px')
             .attr('alignment-baseline', 'middle')
             .attr('lengthAdjust', 'spacingAndGlyphs')
-            .style('font-size', (d) =>  getScaledDimensionValue(d.popularity, [0, 100], .03))
             // .attr('font-weight', (d) => getScaledDimensionValue(d.radius, [0, 100], .02))
-            .style('position', 'absolute')
             .style('letter-spacing', 1.3)
-            .style('textLength', (d) => d.popularity)
             .style('opacity', '0')
+            .style('font-size', (d) =>  getScaledDimensionValue(d.popularity, [0, 100], .03))
+            .style('textLength', (d) => d.popularity)
+            .text((d) => d.name)
+
             .on('mouseover', (event, d) => {
                 showTextOnNode(true, d.id);
             })
