@@ -1,0 +1,13 @@
+@import '../../utils/scss/applicationConstants.module.scss';
+
+.artist_analytics {
+    &_force_directed_graph {
+        &_container {
+            height: 80%;
+            width: 80%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    }
+}

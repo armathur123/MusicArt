@@ -5,25 +5,22 @@ import { useSpotifyApi } from '@/utils/hooks/useSpotifyApi';
 import { Artist } from '@spotify/web-api-ts-sdk';
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
-import Circle from '../_components/_circle/Circle';
-import styles from './forceDirectArt.module.scss';
+import styles from './forceDirected.module.scss';
+
+interface IForceDirectedGraph {
+    data: Artist[];
+}
 
 type ArtistNodeType = Artist & d3.SimulationNodeDatum & {radius: number}
 type GenreLinksType = d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: string[]};
 type D3ForceGraphElement<T> = d3.Selection<d3.BaseType | SVGTextElement, T, d3.BaseType, unknown>
 type ConnectionCacheType = ( {[key: string]: string[] | undefined;})
 
-const ForceDirectedArt = () => {
-    const { data, loading, error } = useSpotifyApi<{items: Artist[]}>(spotifyDataEndpoints.getUsersTop.artist, {
-        method: 'GET',
-        params: {
-            time_range: 'medium_term',
-            limit: '20'
-        }
-    });
+const ForceDirectedGraph: React.FC<IForceDirectedGraph> = ({ data }) => {
 
     const svgContainer = useRef<any>();
-    const svg = d3.select('svg');
+    const svgRef = useRef<any>();
+    const svg = d3.select(svgRef.current);
 
     const [width, setWidth] = useState<number>(0);
     const [height, setHeight] = useState<number>(0);
@@ -110,19 +107,19 @@ const ForceDirectedArt = () => {
         const nodeID = `#node_${id}`;
 
         if (show) {
-            d3.select(labelID)
+            svg.select(labelID)
                 .transition(transition)
                 .style('opacity', '1');
-            d3.select(nodeID)
+            svg.select(nodeID)
                 .transition(transition)
                 .style('filter', 'brightness(70%)');
         }
         else {
-            d3.select(labelID)
+            svg.select(labelID)
                 .transition(transition)
                 .style('opacity', '0');
             
-            d3.select(nodeID)
+            svg.select(nodeID)
                 .transition(transition)
                 .style('filter', 'brightness(100%)');
         }
@@ -200,8 +197,8 @@ const ForceDirectedArt = () => {
             // Update and restart simulation
             (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
 
-            const nodes: d3.Selection<d3.BaseType, ArtistNodeType, d3.BaseType, unknown> = d3.select('#nodes').selectAll('image');
-            const text: d3.Selection<d3.BaseType, ArtistNodeType, d3.BaseType, unknown> = d3.select('#nodeLabels').selectAll('text');        
+            const nodes: d3.Selection<d3.BaseType, ArtistNodeType, d3.BaseType, unknown> = svg.select('#nodes').selectAll('image');
+            const text: d3.Selection<d3.BaseType, ArtistNodeType, d3.BaseType, unknown> = svg.select('#nodeLabels').selectAll('text');        
 
             // Maybe add a force that centers selected node?
             simulation
@@ -240,13 +237,13 @@ const ForceDirectedArt = () => {
         svg.append('g')
             .attr('id', 'nodeLabels');
 
-        const artists = data.items;
-        const nodeDataInit: ArtistNodeType[] = artists.map((artist, i) => (
+
+        // move this logic to useMemo
+        const nodeDataInit: ArtistNodeType[] = data.map((artist, i) => (
             { ...artist, index: i, radius: getScaledDimensionValue(artist.popularity, [0, 100], .2) }
         ));
 
-        const { connectionCache, allLinks } = connectionCacheBuilder(artists);
-
+        const { connectionCache, allLinks } = connectionCacheBuilder(data);
 
         // Set up simulation forces
         const simulationInit: d3.Simulation<ArtistNodeType, GenreLinksType> = d3.forceSimulation<ArtistNodeType>(nodeDataInit)
@@ -333,9 +330,9 @@ const ForceDirectedArt = () => {
 
     return (
         <div ref={svgContainer} className={styles.spotify_art_container}>
-            <svg width={width} height={height}/>
+            <svg ref={svgRef} width={width} height={height}/>
         </div>
     );
 };
  
-export default ForceDirectedArt;
+export default ForceDirectedGraph;
