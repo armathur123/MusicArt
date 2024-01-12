@@ -1,0 +1,29 @@
+@import '../../utils/scss/applicationConstants.module.scss';
+
+.artist_analytics {
+    &_container {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 20px;
+        height: 100%;
+        width: 100%;
+    }
+
+    &_search_field {
+        width: 80%;
+    }
+
+    &_force_directed_graph {
+        &_container {
+            border-radius: 5px;
+            background-color: $widget_background;
+            height: 80%;
+            width: 80%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    }
+}

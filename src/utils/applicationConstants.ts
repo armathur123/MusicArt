@@ -20,7 +20,10 @@ const authorizationConstants: AuthorizationConstantsType = {
 
 const spotifyDataEndpoints = {
     getUserProfileData: 'https://api.spotify.com/v1/me',
-    getUsersTop: 'https://api.spotify.com/v1/me/top/tracks'
+    getUsersTop: {
+        track: 'https://api.spotify.com/v1/me/top/tracks',
+        artist: 'https://api.spotify.com/v1/me/top/artists'
+    } 
 };
 
 export { authorizationConstants, spotifyDataEndpoints };
