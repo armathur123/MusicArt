@@ -9,6 +9,8 @@ import styles from './forceDirected.module.scss';
 
 interface IForceDirectedGraph {
     data: Artist[];
+    selectedData?: Artist;
+    setSelectedData: (selection: Artist) => void;
 }
 
 type ArtistNodeType = Artist & d3.SimulationNodeDatum & {radius: number}
@@ -16,7 +18,7 @@ type GenreLinksType = d3.SimulationLinkDatum<ArtistNodeType> & {commonGenres: st
 type D3ForceGraphElement<T> = d3.Selection<d3.BaseType | SVGTextElement, T, d3.BaseType, unknown>
 type ConnectionCacheType = ( {[key: string]: string[] | undefined;})
 
-const ForceDirectedGraph: React.FC<IForceDirectedGraph> = ({ data }) => {
+const ForceDirectedGraph: React.FC<IForceDirectedGraph> = ({ data, selectedData, setSelectedData }) => {
 
     const svgContainer = useRef<any>();
     const svgRef = useRef<any>();
@@ -31,7 +33,6 @@ const ForceDirectedGraph: React.FC<IForceDirectedGraph> = ({ data }) => {
     const [nodes, setNodes] = useState<D3ForceGraphElement<ArtistNodeType>>();
     const [nodeLabels, setNodeLabels] = useState<D3ForceGraphElement<ArtistNodeType>>();
     const [links, setLinks] = useState<D3ForceGraphElement<GenreLinksType>>();
-    const [selectedArtist, setSelectedArtist] = useState<ArtistNodeType>();
 
     // This function calculates width and height of the container
     const getSvgContainerSize = () => {
@@ -150,62 +151,80 @@ const ForceDirectedGraph: React.FC<IForceDirectedGraph> = ({ data }) => {
     };
     
 
-    const generateNodeLinksByGenre = (d: ArtistNodeType, simulation: d3.Simulation<ArtistNodeType, GenreLinksType>, connectionCache: ConnectionCacheType) => {
-        console.log('clicked', selectedArtist?.id, d.id);
+    const generateNodeLinksByGenre = (d: Artist, simulation: d3.Simulation<ArtistNodeType, GenreLinksType>, connectionCache: ConnectionCacheType) => {
+        // console.log('clicked', d.name, selectedData?.name);
+        const linkData: GenreLinksType[] = [];
+        simulation.stop();
+        setSelectedData(d);
 
-        //this doesn't work, not tracking state changes for some reason. I think that its catching an old reference to the state? idk
-        if (!selectedArtist || selectedArtist.id !== d.id) { 
-            // console.log(selectedArtistID, d.id);
-            // console.log('wut', selectedArtistID !== d.id);
-            const linkData: GenreLinksType[] = [];
-            simulation.stop();
-            setSelectedArtist(() => d);
+        // showTextOnNode(true, d.id); figure out how to remove this when next is clicked, mabye write another function for this
 
-            const connectionCacheKeys: string[] = Object.keys(connectionCache);
-            for (const connectionCacheKey of connectionCacheKeys) {
-                const containsID = connectionCacheKey.includes(d.id);
-                const commonGenres = connectionCache[connectionCacheKey];
-                if (containsID && commonGenres) {
-                    const targetID = connectionCacheKey.split('_').find((value) => value !== d.id);
-                    linkData.push({ source: d.id, target: targetID!, commonGenres: commonGenres });
-                }
+        const connectionCacheKeys: string[] = Object.keys(connectionCache);
+        for (const connectionCacheKey of connectionCacheKeys) {
+            const containsID = connectionCacheKey.includes(d.id);
+            const commonGenres = connectionCache[connectionCacheKey];
+            if (containsID && commonGenres) {
+                const targetID = connectionCacheKey.split('_').find((value) => value !== d.id);
+                linkData.push({ source: d.id, target: targetID!, commonGenres: commonGenres });
             }
-
-            const linkNodesWithData = svg
-                .select('#links')
-                .selectAll('line')
-                .data<GenreLinksType>(linkData);
-            
-            const linkNodesJoined = linkNodesWithData
-                .join((enter) => {
-                    return enter
-                        .append('line')
-                        .attr('id', (d: GenreLinksType) => `${d.source}_${d.target}`)
-                        // .transition()
-                        // .duration(950)
-                        .style('stroke', 'white ')
-                        .style('stroke-opacity', 0.6);
-
-                },
-                (update) => {
-                    return update;
-                },
-                (exit) => {
-                    return exit.remove();
-                });                         
-
-            // Update and restart simulation
-            (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
-
-            const nodes: d3.Selection<d3.BaseType, ArtistNodeType, d3.BaseType, unknown> = svg.select('#nodes').selectAll('image');
-            const text: d3.Selection<d3.BaseType, ArtistNodeType, d3.BaseType, unknown> = svg.select('#nodeLabels').selectAll('text');        
-
-            // Maybe add a force that centers selected node?
-            simulation
-                .on('tick', () => update(nodes, text, linkNodesJoined))
-                .alpha(.05)
-                .restart();
         }
+
+        const linkNodesWithData = svg
+            .select('#links')
+            .selectAll('line')
+            .data<GenreLinksType>(linkData);
+            
+        const linkNodesJoined = linkNodesWithData
+            .join((enter) => {
+                return enter
+                    .append('line')
+                    .attr('id', (d: GenreLinksType) => `${d.source}_${d.target}`)
+                // .transition()
+                // .duration(950)
+                    .style('stroke', 'white ')
+                    .style('stroke-opacity', 0.6);
+
+            },
+            (update) => {
+                return update;
+            },
+            (exit) => {
+                return exit.remove();
+            });                         
+
+        // Update and restart simulation
+        (simulation.force('link') as d3.ForceLink<ArtistNodeType, GenreLinksType>).links(linkData);
+
+        const nodes: D3ForceGraphElement<ArtistNodeType> = svg.select('#nodes').selectAll('image');
+        const text: D3ForceGraphElement<ArtistNodeType> = svg.select('#nodeLabels').selectAll('text');        
+
+        // Center selected node
+        nodes
+            .select(`node_${d.id}`)
+            .attr('x', width / 2)
+            .attr('y', height / 2);
+
+        // Trying to move the nodes when one is selected, this needs work
+        simulation
+            .on('tick', () => update(nodes, text, linkNodesJoined))
+            .force('x', d3.forceX((d: ArtistNodeType) => {
+                if (d.id === selectedData?.id) {
+                    return width / 2;
+                }
+                else {
+                    return 0;
+                }
+            }).strength(1))
+            .force('y', d3.forceY((d: ArtistNodeType) => {
+                if (d.id === selectedData?.id) {
+                    return height / 2;
+                }
+                else {
+                    return 0;
+                }
+            }).strength(1))
+            .alpha(.04)
+            .restart();
     };
 
     // Scales (Domain is the scale of values to pass in; range is the scale of values that will be output)
@@ -247,13 +266,12 @@ const ForceDirectedGraph: React.FC<IForceDirectedGraph> = ({ data }) => {
 
         // Set up simulation forces
         const simulationInit: d3.Simulation<ArtistNodeType, GenreLinksType> = d3.forceSimulation<ArtistNodeType>(nodeDataInit)
-            .force('charge', d3.forceManyBody().strength(30))
+            .force('charge', d3.forceManyBody().strength(15))
             .force('center', d3.forceCenter(width / 2, height / 2))
             .force('collide', d3.forceCollide<ArtistNodeType>().radius((d) => {return d.radius / 2;}))
             .force('link', d3.forceLink<ArtistNodeType, d3.SimulationLinkDatum<ArtistNodeType>>().id((d) => d.id).strength(.5))
             .force('bounds', checkBoundsForce(width, height))
-            .force('x', d3.forceX(width / 2).strength(.1))
-            .force('y', d3.forceY(height / 2).strength(.1))
+            .alpha(.05)
             .on('tick', () => update(artistNodesInit, artistNodeLabels));
 
 
@@ -316,17 +334,18 @@ const ForceDirectedGraph: React.FC<IForceDirectedGraph> = ({ data }) => {
     }, [data, width, height]);
 
     useEffect(() => {
+        console.log(selectedData, 'check');
         if (!nodeData || !simulation || !connectionCache || !nodes) {
             return;
         }
-        
-        console.log(selectedArtist, 'changeds');
 
         nodes
             .on('click', (event, d) => generateNodeLinksByGenre(d, simulation, connectionCache));
 
-    }, [simulation, nodeData, connectionCache, selectedArtist]);
-
+        if (selectedData) {
+            generateNodeLinksByGenre(selectedData, simulation, connectionCache);
+        }
+    }, [simulation, nodeData, connectionCache, selectedData]);
 
     return (
         <div ref={svgContainer} className={styles.spotify_art_container}>
